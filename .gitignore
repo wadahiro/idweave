@@ -1,0 +1,28 @@
+node_modules/
+dist/
+# Run output (junit/ctrf/dumps) — per-version example folder (examples/<ver>/).
+examples/*/reports/
+# Bind-mounted CSV files are produced at runtime, not committed.
+examples/*/infra/data/csv/*.csv
+# Whole-environment snapshot artifacts (volume tars + CSV baseline). The flat form
+# is advanced/keycloak; the nested form is midpoint-basic's per-version infra/<ver>/.
+examples/*/infra/snapshots/
+examples/*/infra/*/snapshots/
+# midPoint marks post-init imports done by renaming; the read-only mount prevents
+# this, but ignore the markers defensively in case of a read-write mount.
+examples/*/midpoint-config/*.done
+examples/*/midpoint-config/*/*.done
+.env
+# Claude Code workspace (agent settings, vendored skills) — local only, not published.
+.claude/
+# playwright-cli skill scratch (config/snapshots/screenshots) — interactive debugging only.
+.playwright-cli/
+.playwright/
+# Local dev tool-version manager config (personal; the project pins node via package.json engines).
+mise.toml
+mise.local.toml
+.mise.toml
+.mise.local.toml
+
+# local-only snapshot overlay (host-specific btrfs subvolume paths)
+compose.btrfs.yml

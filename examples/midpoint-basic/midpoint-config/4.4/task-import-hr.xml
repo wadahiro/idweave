@@ -1,0 +1,32 @@
+<!--
+  Registered import task for the HR CSV source.
+
+  The harness verifies your DEPLOYED tasks: a `trigger: import` on the hr system
+  runs THIS task (run-now) via triggers.hr.import in the suite. There is no
+  generic /resources/{oid}/import fallback, so every imported system ships its
+  own import task (symmetric with the recon task in task-recon-hr.xml).
+
+  Single-run runnable (like the recon task): goes `closed` after each run and is
+  re-run on demand with run-now.
+-->
+<task xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+      oid="c5555555-5555-5555-5555-555555555555">
+    <name>HR Import</name>
+    <description>On-demand import of the HR CSV source. Triggered by the harness via run-now.</description>
+    <!-- 4.4 REQUIRES a task owner: it treats an owner-less task as "flawed" and
+         suspends it at boot (4.8/4.10 tolerate the absence). administrator, like
+         the recon task. -->
+    <ownerRef oid="00000000-0000-0000-0000-000000000002" type="UserType"/>
+    <executionState>runnable</executionState>
+    <activity>
+        <work>
+            <import>
+                <resourceObjects>
+                    <resourceRef oid="c5111111-1111-1111-1111-111111111111"/>
+                    <kind>account</kind>
+                    <intent>default</intent>
+                </resourceObjects>
+            </import>
+        </work>
+    </activity>
+</task>

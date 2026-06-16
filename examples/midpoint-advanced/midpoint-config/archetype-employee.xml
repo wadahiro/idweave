@@ -1,0 +1,37 @@
+<!--
+  Employee archetype — given to everyone imported from HR.
+
+  IS-A Person (inherits its object template, computing fullName etc.) and induces
+  the standard End user role for self-service. It also induces the LDAP and SCIM
+  accounts, so every employee is auto-provisioned to BOTH targets at join (the
+  access role then layers the app-users group membership on top).
+-->
+<archetype xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+           oid="f1000000-0000-0000-0000-000000000008">
+    <name>Employee</name>
+    <superArchetypeRef oid="00000000-0000-0000-0000-000000000702" type="ArchetypeType"/>
+    <inducement>
+        <targetRef oid="00000000-0000-0000-0000-000000000008" type="RoleType"/>
+    </inducement>
+    <!-- Auto-provision a baseline account on each downstream target at join. -->
+    <inducement>
+        <construction>
+            <resourceRef oid="f1000000-0000-0000-0000-000000000002"/>
+            <kind>account</kind>
+            <intent>default</intent>
+        </construction>
+    </inducement>
+    <inducement>
+        <construction>
+            <resourceRef oid="f1000000-0000-0000-0000-000000000003"/>
+            <kind>account</kind>
+            <intent>default</intent>
+        </construction>
+    </inducement>
+    <archetypePolicy>
+        <display>
+            <label>Employee</label>
+            <pluralLabel>Employees</pluralLabel>
+        </display>
+    </archetypePolicy>
+</archetype>

@@ -1,0 +1,8 @@
+{
+  "dn": "uid=crudtest,ou=people,dc=example,dc=org",
+  "uid": "crudtest",
+  "cn": "Crud Test",
+  "sn": "Test",
+  "givenName": "Crud",
+  "mail": "crud@example.com"
+}

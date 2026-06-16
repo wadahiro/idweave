@@ -1,0 +1,102 @@
+# Suite manifest — the deployment-under-test these example scenarios share.
+# Binds the logical names scenarios use to concrete systems. Suite data, not
+# engine config: a real private suite ships its own suite.yaml under testdata/.
+
+# With more than one system, mutate/trigger steps that omit `system:` use this one.
+defaultSystem: hr
+
+# GUI page objects for the UI-driven scenarios (request-ui/approve-ui). Selects
+# the stock reference module for this deployment's midPoint major; this demo runs stock
+# 4.10, so no project override is needed (a real deployment that customises a
+# screen adds `overrides: ./<file>.ts`, resolved relative to this suite dir).
+gui:
+  # The GUI page-object version comes from systems.idm.midpoint.version below.
+  # The assign-ui operator logs into the GUI as administrator; its GUI password
+  # is the same admin credential as REST (per version), named via env.
+  principals:
+    administrator: { passwordEnv: MIDPOINT_PASSWORD }
+
+# External systems registered ONCE, midPoint-independent. The protocol is the
+# discriminating key (csv here). A system's ROLE is decided by how a scenario
+# uses it: written/triggered = source, asserted via expect.accounts = target.
+systems:
+  # The midPoint instance under test, declared as a system so snapshot-restore can clear its
+  # caches after a rollback with the version-correct payload (a multi-midPoint
+  # deployment lists each instance + its own version). Connection via env-var NAMES;
+  # one admin credential serves REST (and GUI). Not a scenario read/write target.
+  idm:
+    midpoint:
+      baseUrlEnv: MIDPOINT_BASE_URL
+      usernameEnv: MIDPOINT_USER
+      passwordEnv: MIDPOINT_PASSWORD
+      version: "${MP_VERSION}"
+
+  # The CSV HR source (resource-csv-hr.xml) — feeds UserType. The default system,
+  # so user scenarios may omit the `system:` key on steps.
+  hr:
+    csv:
+      fileName: hr-source.csv
+      columns: [login, firstname, lastname, email, disabled, org, roles, password]
+      idColumn: login
+
+  # The CSV Org source (resource-csv-org.xml) — feeds the OrgType tree. Scenarios
+  # using it name `system: org` explicitly.
+  org:
+    csv:
+      fileName: org-source.csv
+      columns: [orgname, parent]
+      idColumn: orgname
+
+  # The outbound CSV target a role grant provisions into. Read (never written) by
+  # scenarios via expect.accounts[].system. `disabled` carries outbound activation
+  # (enabled -> "", disabled -> "true"), so disable propagates here (the account
+  # stays present but flagged).
+  app-target:
+    csv:
+      fileName: app-target.csv
+      columns: [username, firstname, lastname, email, disabled]
+      idColumn: username
+
+  # The SAME App target, declared as a CONNECTOR-MEDIATED `resource` — read THROUGH
+  # midPoint's connector (an executeScript calling the provisioning ResourceObjectConverter
+  # with NO shadow persisted), instead of reading the CSV file directly. The generic,
+  # side-effect-free way to assert a target idweave has no native client for. Asserted by
+  # `expect-resource-object` (system: app-cx). objectClass = the connector's native class;
+  # identifierAttr = the attribute to match the identifier on (here the CSV idColumn).
+  app-cx:
+    resource:
+      name: "App CSV Target"
+      objectClass: ri:AccountObjectClass
+      identifierAttr: username
+      attributes: [username, firstname, lastname, email, disabled]
+
+  # The App target addressed by the connector PRIMARY identifier (__uid__) instead of a
+  # regular attribute — a single direct GET by UID. (For an LDAP target, __name__ would
+  # address by the secondary identifier / DN.)
+  app-cx-uid:
+    resource:
+      name: "App CSV Target"
+      objectClass: ri:AccountObjectClass
+      identifierAttr: __uid__
+      attributes: [username, firstname, lastname, email, disabled]
+
+# midPoint registered tasks the `trigger` step runs, keyed by system. Both recon
+# and import run a DEPLOYED task (no generic fallback) — the harness verifies the
+# tasks your deployment actually ships.
+triggers:
+  hr:
+    recon: c5444444-4444-4444-4444-444444444444  # task-recon-hr.xml
+    import: c5555555-5555-5555-5555-555555555555  # task-import-hr.xml
+  org:
+    import: c5777777-7777-7777-7777-777777777777  # task-import-org.xml
+
+# Fast near-non-stop snapshot-restore topology (any backend): STOP only postgres and
+# reset only its volume; the midPoint app is PAUSED (frozen, not rebooted) and
+# recovers via its DB connection pool in seconds — skipping midPoint's minutes-long
+# reboot. The snapshot CLI auto-falls back to a full restart if the app has restarted
+# since the baseline (node-identity guard). `stop`/`rollback` name compose volume
+# KEYS (btrfs → subvolume under SNAPSHOT_BTRFS_DIR; tar → <project>_<key> volume).
+snapshot:
+  restore:
+    stop: [midpoint_data]
+    rollback: [midpoint_data]

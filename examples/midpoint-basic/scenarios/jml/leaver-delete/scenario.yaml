@@ -1,0 +1,39 @@
+# Leaver — delete via reconciliation.
+# When an account disappears from the HR source, reconciliation detects the
+# `deleted` situation and runs deleteFocus — removing the user and, with it,
+# deprovisioning the outbound target account (offboarding).
+id: leaver-delete
+requirement: REQ-JML-LEAVER-001
+description: >
+  jdoe is joined and granted access (target provisioned). The HR record is then
+  removed; reconciliation (not import — import can't see deletions) detects the
+  deleted account and deletes the focus, deprovisioning the target.
+
+setup:
+  # start from an empty target (it accumulates across scenarios; absent-asserts need it clean)
+  - clear-system: app-target
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: jdoe, deprovision: false }
+steps:
+  - set:
+      - login: jdoe
+        firstname: John
+        lastname: Doe
+        email: jdoe@example.com
+        disabled: ""
+  - trigger: import
+  - assign:
+      user: jdoe
+      role: App Target Access
+  - remove:
+      - jdoe
+  - trigger: recon
+  - expect:
+      objects:
+        - type: user
+          name: jdoe
+          absent: true
+      accounts:
+        - system: app-target
+          identifier: jdoe
+          absent: true

@@ -1,0 +1,49 @@
+# Leaver fan-out: deprovision an identity from BOTH downstream systems at once.
+# The leaver counterpart to onboard-fanout — provision pdoe (HR -> midPoint -> LDAP +
+# SCIM), confirm both real accounts exist, then a `delete-object` (the normal MODEL
+# delete, raw:false): midPoint's projector removes the focus AND deprovisions both
+# linked target accounts. Assert the focus and BOTH provisioned accounts are gone. The
+# HR (CSV) SOURCE shadow is repo-evicted; the source row (managed host-side) is left
+# intact. (Setup uses clear-focus — the WF-safe force pre-clean.)
+id: leaver-fanout
+requirement: REQ-ADVANCED-LEAVER-001
+description: >
+  Provision pdoe to LDAP + SCIM, then a deprovisioning delete-object removes the focus
+  and both provisioned accounts — asserting the projector deprovisions a multi-target
+  identity in one model delete.
+
+setup:
+  # Idempotent pre-clean: force-clean any leftover pdoe (focus + downstream accounts).
+  - idm/clear-focus: { name: pdoe }
+steps:
+  - set:
+      - login: pdoe
+        firstname: Paula
+        lastname: Doe
+        email: pdoe@example.com
+    system: hr
+  - trigger: import
+  - assign:
+      user: pdoe
+      role: App Access
+  - expect:
+      accounts:
+        - system: dir
+          identifier: pdoe
+          expected: expected/ldap.json
+        - system: guard
+          identifier: pdoe
+          expected: expected/scim.json
+  - idm/delete-object: { name: pdoe }
+  - expect:
+      objects:
+        - type: user
+          name: pdoe
+          absent: true
+      accounts:
+        - system: dir
+          identifier: pdoe
+          absent: true
+        - system: guard
+          identifier: pdoe
+          absent: true

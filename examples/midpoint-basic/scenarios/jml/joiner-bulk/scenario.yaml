@@ -1,0 +1,25 @@
+# Joiner — bulk from a CSV fixture file.
+# Demonstrates `set: { file: ... }`: load many source rows from a committed CSV
+# fixture instead of inlining them in YAML. Each unmatched row creates a user.
+id: joiner-bulk
+requirement: REQ-JML-JOINER-002
+description: >
+  Several HR records loaded from a CSV fixture are imported, each creating a
+  midPoint user via the inbound mappings.
+
+setup:
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: alice, deprovision: false }
+  - clear-focus: { name: bob, deprovision: false }
+steps:
+  - set:
+      file: fixtures/hr.csv
+  - trigger: import
+  - expect:
+      objects:
+        - type: user
+          name: alice
+          expected: expected/user.alice.json
+        - type: user
+          name: bob
+          expected: expected/user.bob.json

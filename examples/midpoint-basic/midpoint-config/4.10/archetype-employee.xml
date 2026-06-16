@@ -1,0 +1,33 @@
+<!--
+  Employee archetype — the type given to everyone imported from HR.
+
+  It induces the standard "End user" role (00000000-0000-0000-0000-000000000008),
+  which grants the self-service authorizations needed to log in to the GUI and
+  use "Request access". So making HR users Employees (the resource sets this as
+  their focus archetype) is what lets them request roles from the screen.
+-->
+<archetype xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+           oid="c5888888-8888-8888-8888-888888888888">
+    <name>Employee</name>
+    <!--
+      An Employee IS-A Person: inherit the standard Person archetype (and its
+      object template, which computes fullName etc.) so replacing the resource's
+      focus archetype does not drop that behaviour. On top of Person, induce the
+      End user role for self-service GUI access.
+    -->
+    <superArchetypeRef oid="00000000-0000-0000-0000-000000000702" type="ArchetypeType"/>
+    <inducement>
+        <targetRef oid="00000000-0000-0000-0000-000000000008" type="RoleType"/>
+    </inducement>
+    <!-- Read the role-catalog org tree so requesters can browse it (End user
+         alone can't read OrgType). -->
+    <inducement>
+        <targetRef oid="c5dddddd-dddd-dddd-dddd-dddddddddddd" type="RoleType"/>
+    </inducement>
+    <archetypePolicy>
+        <display>
+            <label>Employee</label>
+            <pluralLabel>Employees</pluralLabel>
+        </display>
+    </archetypePolicy>
+</archetype>

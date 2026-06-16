@@ -1,0 +1,42 @@
+# Connector-mediated addressing modes.
+# A provisioned account is asserted through the connector (a) addressed by the connector
+# PRIMARY identifier (__uid__, via the `app-cx-uid` resource system) — a single GET by UID
+# rather than a regular-attribute scan — and (b) as the FULL object set on the target
+# (`all: true`). (A `__name__` / secondary-identifier GET addresses an LDAP DN; the CSV
+# connector here has no secondary identifier, so it isn't exercised in this all-CSV demo.)
+# All connector-mediated, no shadow.
+id: connector-addressing
+requirement: REQ-CX-ADDR-001
+description: >
+  Provision cxa to the App target, then assert it through the connector both by the
+  primary identifier (__uid__) and as the full object set (all), and assert the user.
+
+setup:
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: cxa, deprovision: false }
+  # all:true asserts the WHOLE target — start it empty (it accumulates across scenarios)
+  - clear-system: app-target
+steps:
+  - set:
+      - login: cxa
+        firstname: Cx
+        lastname: Addr
+        email: cxa@example.com
+        disabled: ""
+  - trigger: import
+  - assign:
+      user: cxa
+      role: App Target Access
+  - expect:
+      objects:
+        - type: user
+          name: cxa
+          expected: expected/user.cxa.json
+  - expect-resource-object:
+      system: app-cx-uid
+      identifier: cxa
+      expected: expected/by-uid.json
+  - expect-resource-object:
+      system: app-cx
+      all: true
+      expected: expected/all.json

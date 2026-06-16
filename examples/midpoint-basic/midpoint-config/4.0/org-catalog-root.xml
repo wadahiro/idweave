@@ -1,0 +1,7 @@
+<!-- Role-catalog ROOT org (level 1). The systemConfiguration roleCatalogRef
+     points here, so the self-service catalog renders the tree from this node. -->
+<org xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+     oid="c5e10000-0000-0000-0000-000000000001">
+    <name>Catalog Root</name>
+    <displayName>Catalog Root</displayName>
+</org>

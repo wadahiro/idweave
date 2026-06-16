@@ -1,0 +1,47 @@
+# Whole-set assertion on an LDAP target (`expect.accounts` with `all: true`).
+# idweave drives the directory itself (no midPoint): start from an EMPTY container
+# (clear-system), add exactly two entries, then assert the FULL set under ou=people
+# is precisely those two (order-independent). Remove one and re-assert the set is the
+# remaining one; clear and assert the set is empty. This is the "exactly these
+# accounts exist" oracle — the complement of a per-identifier assertion.
+id: ldap-all-set
+requirement: REQ-ADVANCED-LDAP-ALL-001
+description: >
+  Assert the entire ou=people set with `all: true`: two entries, then one after a
+  remove, then none after a clear — order-independent, all driven by idweave against
+  the directory.
+
+setup:
+  # Own the whole container for this run (serial execution; each scenario owns its data).
+  - clear-system: dir
+steps:
+  - add:
+      - uid: alpha
+        cn: Alpha One
+        sn: One
+        givenName: Alpha
+        mail: alpha@example.com
+      - uid: bravo
+        cn: Bravo Two
+        sn: Two
+        givenName: Bravo
+        mail: bravo@example.com
+    system: dir
+  - expect:
+      accounts:
+        - system: dir
+          all: true
+          expected: expected/all-two.json
+  - remove: [alpha]
+    system: dir
+  - expect:
+      accounts:
+        - system: dir
+          all: true
+          expected: expected/all-one.json
+  - clear-system: dir
+  - expect:
+      accounts:
+        - system: dir
+          all: true
+          expected: expected/all-empty.json

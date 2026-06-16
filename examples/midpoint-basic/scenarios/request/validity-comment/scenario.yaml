@@ -1,0 +1,41 @@
+# Requesting a role WITH a REQUEST-LEVEL (bulk) assignment validity window (valid
+# from/to) and a request comment, driven through the self-service GUI. The bulk
+# validity is ONE window applied to the WHOLE cart — set once at the checkout (new
+# UI: the "Custom length" panel; old UI: looped onto each role's panel); the
+# comment in the cart's Comment box. The oracle asserts the resulting assignment
+# carries the validFrom/validTo (kept through normalization); the comment is
+# GUI-only input (it lands on the request/case, not the focus end-state) so it's
+# driven but not asserted. (Per-role validity is exercised by validity-per-role.)
+id: request-validity-comment
+requirement: REQ-WF-VALIDITY-001
+description: >
+  carol requests "Catalog App Access" with a validity window (2030-01-02 →
+  2030-12-31) and a comment; the granted assignment carries that validity.
+setup:
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: carol, deprovision: false }
+steps:
+  - set:
+      - login: carol
+        firstname: Carol
+        lastname: Req
+        email: carol@example.com
+        disabled: ""
+        org: ""
+        roles: ""
+        password: Test1234!
+  - trigger: import
+  - request-ui:
+      as: carol
+      comment: Project access needed for Q1 onboarding.
+      validFrom: "2030-01-02"
+      validTo: "2030-12-31"
+      items:
+        - access: Catalog App Access
+          view: role-catalog
+          catalog: [Catalog Root, Cloud Services, Web Apps]
+  - expect:
+      objects:
+        - type: user
+          name: carol
+          expected: expected/user.carol.json

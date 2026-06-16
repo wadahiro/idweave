@@ -1,0 +1,53 @@
+# Independent Keycloak example — own compose project (idweave-keycloak), own port
+# (8090), and a DEDICATED postgres so snapshot-restore rolls Keycloak's DB back on its
+# own volume (keycloak_data), independent of any midPoint stack.
+#
+# Exercises the snapshot-restore cache-clear participant: near-non-stop restore stops
+# + resets only keycloak_data and PAUSES Keycloak (no reboot), so its realm/user/keys
+# caches go stale against the rolled-back DB — then the afterRestore hook clears them.
+
+services:
+  keycloak_data:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=keycloak
+      - POSTGRES_USER=keycloak
+      - POSTGRES_PASSWORD=keycloak.db.pw
+    networks: [net]
+    volumes:
+      - keycloak_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: ["start-dev", "--import-realm"]
+    depends_on:
+      keycloak_data:
+        condition: service_healthy
+    environment:
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://keycloak_data:5432/keycloak
+      - KC_DB_USERNAME=keycloak
+      - KC_DB_PASSWORD=keycloak.db.pw
+      # Bootstrap (master-realm) admin — the keycloak system authenticates to the
+      # imported idweave realm via the idweave-admin service account instead.
+      - KC_BOOTSTRAP_ADMIN_USERNAME=admin
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=admin
+      - KC_HEALTH_ENABLED=true
+    ports:
+      - 8090:8080
+    volumes:
+      # Realm seed: Keycloak imports every realm JSON here at startup (= "test realm").
+      - ./realm:/opt/keycloak/data/import:ro
+    networks: [net]
+
+networks:
+  net:
+    driver: bridge
+
+volumes:
+  keycloak_data:

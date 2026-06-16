@@ -1,0 +1,128 @@
+<!--
+  Our deployment config under test: a CSV "Org" source resource (org structure).
+
+  An authoritative feed of the ORGANIZATION TREE: each row is an org unit, with a
+  `parent` column naming its parent unit. Unmatched rows create OrgType objects
+  (focus type below is OrgType, not UserType). The hierarchy is built the midPoint
+  way: the `parent` column drives an ASSIGNMENT to the parent org (resolved by
+  name via assignmentTargetSearch) — midPoint then derives `parentOrgRef`
+  automatically. We never set parentOrgRef directly.
+
+  Stable oid + container filePath, like the other CSV resources.
+-->
+<resource xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+          xmlns:q="http://prism.evolveum.com/xml/ns/public/query-3"
+          xmlns:ri="http://midpoint.evolveum.com/xml/ns/public/resource/instance-3"
+          oid="c5666666-6666-6666-6666-666666666666">
+    <name>Org CSV Source</name>
+    <description>CSV source resource for the organization tree (focus = OrgType).</description>
+    <connectorRef>
+        <filter>
+            <q:text>connectorType = "com.evolveum.polygon.connector.csv.CsvConnector"</q:text>
+        </filter>
+    </connectorRef>
+    <connectorConfiguration xmlns:icfc="http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/connector-schema-3">
+        <icfc:configurationProperties
+                xmlns:cfg="http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/bundle/com.evolveum.polygon.connector-csv/com.evolveum.polygon.connector.csv.CsvConnector">
+            <cfg:multivalueDelimiter>;</cfg:multivalueDelimiter>
+            <cfg:fieldDelimiter>,</cfg:fieldDelimiter>
+            <cfg:quote>"</cfg:quote>
+            <cfg:filePath>/opt/midpoint/var/resource_files/org-source.csv</cfg:filePath>
+            <cfg:quoteMode>ALL</cfg:quoteMode>
+            <cfg:encoding>utf-8</cfg:encoding>
+            <cfg:uniqueAttribute>orgname</cfg:uniqueAttribute>
+        </icfc:configurationProperties>
+    </connectorConfiguration>
+
+    <schemaHandling>
+        <objectType>
+            <displayName>Org Unit</displayName>
+            <default>true</default>
+            <objectClass>ri:AccountObjectClass</objectClass>
+            <kind>account</kind>
+
+            <!-- This resource feeds OrgType focus objects, not users. -->
+            <focus>
+                <type>OrgType</type>
+            </focus>
+
+            <attribute>
+                <ref>ri:orgname</ref>
+                <inbound>
+                    <name>Org name to focus name</name>
+                    <target>
+                        <path>$focus/name</path>
+                    </target>
+                </inbound>
+            </attribute>
+            <attribute>
+                <ref>ri:parent</ref>
+                <inbound>
+                    <!--
+                      Parent name -> an assignment to the parent OrgType (found by
+                      name). midPoint derives parentOrgRef from this org-type
+                      assignment. Skipped for a root row whose parent is blank.
+                    -->
+                    <name>Parent name to org assignment</name>
+                    <strength>strong</strength>
+                    <expression>
+                        <assignmentTargetSearch>
+                            <targetType>OrgType</targetType>
+                            <filter>
+                                <q:equal>
+                                    <q:path>name</q:path>
+                                    <expression>
+                                        <script>
+                                            <code>input</code>
+                                        </script>
+                                    </expression>
+                                </q:equal>
+                            </filter>
+                        </assignmentTargetSearch>
+                    </expression>
+                    <target>
+                        <path>assignment</path>
+                    </target>
+                    <condition>
+                        <script>
+                            <code>input != null &amp;&amp; !input.trim().isEmpty()</code>
+                        </script>
+                    </condition>
+                </inbound>
+            </attribute>
+
+            <correlation>
+                <correlators>
+                    <items>
+                        <name>Org name correlation</name>
+                        <item>
+                            <ref>name</ref>
+                        </item>
+                    </items>
+                </correlators>
+            </correlation>
+
+            <synchronization>
+                <reaction>
+                    <name>Linked synchronize</name>
+                    <situation>linked</situation>
+                    <actions><synchronize/></actions>
+                </reaction>
+                <reaction>
+                    <name>Unmatched add focus</name>
+                    <situation>unmatched</situation>
+                    <actions><addFocus/></actions>
+                </reaction>
+                <reaction>
+                    <name>Unlinked link</name>
+                    <situation>unlinked</situation>
+                    <actions><link/></actions>
+                </reaction>
+            </synchronization>
+
+            <defaultOperationPolicy>
+                <policyRef oid="00000000-0000-0000-0000-000000000805"/>
+            </defaultOperationPolicy>
+        </objectType>
+    </schemaHandling>
+</resource>

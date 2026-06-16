@@ -1,0 +1,113 @@
+<!--
+  HR CSV source (inbound-authoritative) — the join trigger for this example.
+
+  An unmatched source row -> addFocus creates a midPoint user (Employee
+  archetype). The Employee archetype then induces the LDAP and SCIM accounts, so
+  a single import fans the new identity out to BOTH downstream systems.
+
+  Trimmed to the minimal join columns (login/firstname/lastname/email); the
+  per-version examples carry the fuller HR matrix. Stable filePath is bind-mounted
+  from CSV_HOST_DIR by infra/compose.test.yml.
+-->
+<resource xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+          xmlns:q="http://prism.evolveum.com/xml/ns/public/query-3"
+          xmlns:ri="http://midpoint.evolveum.com/xml/ns/public/resource/instance-3"
+          oid="f1000000-0000-0000-0000-000000000001">
+    <name>HR CSV Source</name>
+    <description>CSV source resource for the advanced example (Joiner path).</description>
+    <connectorRef>
+        <filter>
+            <q:text>connectorType = "com.evolveum.polygon.connector.csv.CsvConnector"</q:text>
+        </filter>
+    </connectorRef>
+    <connectorConfiguration xmlns:icfc="http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/connector-schema-3">
+        <icfc:configurationProperties
+                xmlns:cfg="http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/bundle/com.evolveum.polygon.connector-csv/com.evolveum.polygon.connector.csv.CsvConnector">
+            <cfg:multivalueDelimiter>;</cfg:multivalueDelimiter>
+            <cfg:fieldDelimiter>,</cfg:fieldDelimiter>
+            <cfg:quote>"</cfg:quote>
+            <cfg:filePath>/opt/midpoint/var/resource_files/hr-source.csv</cfg:filePath>
+            <cfg:quoteMode>ALL</cfg:quoteMode>
+            <cfg:encoding>utf-8</cfg:encoding>
+            <cfg:uniqueAttribute>login</cfg:uniqueAttribute>
+        </icfc:configurationProperties>
+    </connectorConfiguration>
+
+    <schemaHandling>
+        <objectType>
+            <displayName>HR Account</displayName>
+            <default>true</default>
+            <objectClass>ri:AccountObjectClass</objectClass>
+            <kind>account</kind>
+
+            <focus>
+                <archetypeRef oid="f1000000-0000-0000-0000-000000000008"/>
+            </focus>
+
+            <attribute>
+                <ref>ri:login</ref>
+                <inbound>
+                    <name>Login to name</name>
+                    <target><path>$focus/name</path></target>
+                </inbound>
+            </attribute>
+            <attribute>
+                <ref>ri:firstname</ref>
+                <inbound>
+                    <name>Firstname to givenName</name>
+                    <target><path>$focus/givenName</path></target>
+                </inbound>
+            </attribute>
+            <attribute>
+                <ref>ri:lastname</ref>
+                <inbound>
+                    <name>Lastname to familyName</name>
+                    <target><path>$focus/familyName</path></target>
+                </inbound>
+            </attribute>
+            <attribute>
+                <ref>ri:email</ref>
+                <inbound>
+                    <name>Email to emailAddress</name>
+                    <target><path>$focus/emailAddress</path></target>
+                </inbound>
+            </attribute>
+
+            <correlation>
+                <correlators>
+                    <items>
+                        <name>Login correlation</name>
+                        <item><ref>name</ref></item>
+                    </items>
+                </correlators>
+            </correlation>
+
+            <synchronization>
+                <reaction>
+                    <name>Linked synchronize</name>
+                    <situation>linked</situation>
+                    <actions><synchronize/></actions>
+                </reaction>
+                <reaction>
+                    <name>Unmatched add focus</name>
+                    <situation>unmatched</situation>
+                    <actions><addFocus/></actions>
+                </reaction>
+                <reaction>
+                    <name>Deleted remove focus</name>
+                    <situation>deleted</situation>
+                    <actions><deleteFocus/></actions>
+                </reaction>
+                <reaction>
+                    <name>Unlinked link</name>
+                    <situation>unlinked</situation>
+                    <actions><link/></actions>
+                </reaction>
+            </synchronization>
+
+            <defaultOperationPolicy>
+                <policyRef oid="00000000-0000-0000-0000-000000000805"/>
+            </defaultOperationPolicy>
+        </objectType>
+    </schemaHandling>
+</resource>

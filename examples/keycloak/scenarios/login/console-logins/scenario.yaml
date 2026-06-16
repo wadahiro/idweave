@@ -1,0 +1,15 @@
+# Keycloak console logins — login-ui smokes through the generalized auth provider.
+# Each step picks a NAMED login (suite gui.logins) with `to:`; `as`/`password` is
+# who. The provider drives the stock single-page Keycloak login and asserts the
+# outcome by URL (left the IdP login routes = success). Read-only (no reset needed).
+id: console-logins
+requirement: REQ-KC-LOGIN-001
+description: >
+  An end user logs into the Keycloak Account Console (idweave realm) and the admin
+  into the Admin Console (master realm) — the two stock single-page console
+  logins — and a wrong password is rejected.
+
+steps:
+  - login-ui: { as: alice, password: alice-pw-1!, to: account }                      # account console
+  - login-ui: { as: admin, password: admin, to: admin }                              # admin console
+  - login-ui: { as: alice, password: WRONG, to: account, expectFailure: true }       # rejected

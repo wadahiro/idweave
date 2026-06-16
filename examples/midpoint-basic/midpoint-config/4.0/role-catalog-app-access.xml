@@ -1,0 +1,21 @@
+<!--
+  Requestable role published in the role catalog under the "Web Apps" leaf
+  org (it's a MEMBER of that org via the assignment below, so it appears when the
+  requester drills into that org in the catalog tree). Requesting it induces App
+  Target Access, which provisions the App target account — the assertable result.
+  Not approval-gated: this scenario exercises catalog-tree navigation, and the
+  end-state is asserted over REST.
+-->
+<role xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+      oid="c5cccccc-cccc-cccc-cccc-cccccccccccc">
+    <name>Catalog App Access</name>
+    <description>Requestable from the role catalog (member of Platform Team); grants App Target Access.</description>
+    <assignment>
+        <!-- Membership of the leaf org → shows under "Web Apps" in the catalog. -->
+        <targetRef oid="c5e10000-0000-0000-0000-000000000003" type="OrgType"/>
+    </assignment>
+    <inducement>
+        <targetRef oid="c5333333-3333-3333-3333-333333333333" type="RoleType"/>
+    </inducement>
+    <requestable>true</requestable>
+</role>

@@ -1,0 +1,37 @@
+# Joiner — re-import idempotency (linked reaction).
+# The first import joins jdoe (unmatched -> addFocus). A second import of the
+# SAME row must correlate to the existing user (situation `linked`) and run the
+# `synchronize` reaction, leaving exactly one unchanged user — no duplicate, no
+# drift. This locks in that reconciliation/import is idempotent, the property the
+# whole reset-to-baseline design relies on.
+id: joiner-reimport-linked
+requirement: REQ-JML-JOINER-003
+description: >
+  jdoe is joined by a first import; we assert the joined user. The unchanged
+  source is imported again — correlation finds the linked account and synchronize
+  leaves the user identical (idempotent, no duplicate focus).
+
+setup:
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: jdoe, deprovision: false }
+steps:
+  - set:
+      - login: jdoe
+        firstname: John
+        lastname: Doe
+        email: jdoe@example.com
+        disabled: ""
+  - trigger: import
+  # the joined user
+  - expect:
+      objects:
+        - type: user
+          name: jdoe
+          expected: expected/user.jdoe.json
+  # re-import the SAME data: linked -> synchronize, user unchanged
+  - trigger: import
+  - expect:
+      objects:
+        - type: user
+          name: jdoe
+          expected: expected/user.jdoe.json

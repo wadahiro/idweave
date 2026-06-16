@@ -1,0 +1,23 @@
+<!--
+  Self-Service App Access — the REQUESTABLE, approval-gated front door to the App
+  target. Kept separate from "App Target Access" so the direct-assign scenarios
+  keep working without approval, while this role carries the request->approval
+  behaviour:
+    - requestable: shows up in the self-service "Request access" catalog.
+    - assigns the approval metarole: requesting it routes a work item to an
+      approver; nothing is granted until approved.
+    - induces App Target Access: on approval the user gets App Target Access,
+      which provisions the target account.
+-->
+<role xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+      oid="c5bbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb">
+    <name>Self-Service App Access</name>
+    <description>Requestable, approval-gated access to the App target (grants App Target Access once approved).</description>
+    <requestable>true</requestable>
+    <assignment>
+        <targetRef oid="c5aaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" type="RoleType"/>
+    </assignment>
+    <inducement>
+        <targetRef oid="c5333333-3333-3333-3333-333333333333" type="RoleType"/>
+    </inducement>
+</role>

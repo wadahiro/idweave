@@ -1,0 +1,32 @@
+# Admin-driven role assignment through the GUI (assign-ui).
+# An operator (administrator) grants a role to a user via the real edit-user
+# Wicket flow — find the user in the list, open it, the Assignments panel, the
+# "New" picker, select the role, Save — the screen flow REST can't reproduce.
+# The user is created by HR import first; the induced assignment is asserted over
+# REST (the GUI drives INPUT, the oracle asserts the end-state).
+id: admin-assign-role-ui
+requirement: REQ-JML-ASSIGN-UI-001
+description: >
+  administrator assigns "Catalog Browser" to a freshly imported user through the
+  edit-user GUI; the user then carries that role assignment (asserted via REST).
+
+setup:
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: gail, deprovision: false }
+steps:
+  - set:
+      - login: gail
+        firstname: Gail
+        lastname: Ops
+        email: gail@example.com
+        disabled: ""
+  - trigger: import
+  - assign-ui:
+      as: administrator
+      user: gail
+      role: Catalog Browser
+  - expect:
+      objects:
+        - type: user
+          name: gail
+          expected: expected/user.gail.json

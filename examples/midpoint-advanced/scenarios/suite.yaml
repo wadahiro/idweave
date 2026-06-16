@@ -1,0 +1,105 @@
+# Suite manifest for the "advanced" example: one midPoint 4.10 deployment that
+# provisions OUTBOUND to two real downstream systems — an OpenLDAP directory and a
+# SCIM 2.0 service provider (driven through connector-atlassian-guard, so the SCIM
+# server stands in as Atlassian Guard). HR (CSV) is the inbound source.
+#
+# Suite data, not engine config: endpoints come from env-var NAMES (midpoint) or
+# direct URLs (ldap/scim); only the secrets (LDAP bind password, SCIM token) are
+# env, set by the Makefile's advanced block.
+
+# mutate/trigger steps that omit `system:` use this one.
+defaultSystem: hr
+
+systems:
+  # The midPoint instance under test — declared so snapshot-restore can clear its
+  # caches after a rollback with the version-correct payload. Connection via env-var
+  # NAMES; one admin credential serves REST.
+  idm:
+    midpoint:
+      baseUrlEnv: MIDPOINT_BASE_URL
+      usernameEnv: MIDPOINT_USER
+      passwordEnv: MIDPOINT_PASSWORD
+      version: "4.10"
+
+  # The CSV HR source (resource-csv-hr.xml) — feeds UserType (Joiner). Default system.
+  hr:
+    csv:
+      fileName: hr-source.csv
+      columns: [login, firstname, lastname, email]
+      idColumn: login
+
+  # OpenLDAP target (resource-ldap.xml). Accounts are inetOrgPerson entries under
+  # ou=people; the memberof overlay maintains memberOf, so the access role's group
+  # membership is asserted right on the account. URL/bind-DN here; password via env.
+  dir:
+    ldap:
+      url: ldap://localhost:13890
+      bind:
+        dn: cn=admin,dc=example,dc=org
+        passwordEnv: LDAP_BIND_PASSWORD
+      containerDn: ou=people,dc=example,dc=org
+      rdnAttr: uid
+      objectClasses: [inetOrgPerson]
+      attributes: [uid, cn, sn, givenName, mail, memberOf]
+
+  # SCIM target (resource-scim-guard.xml), asserted read-only. Read a User by
+  # userName; project the stable attributes. `groups` carries a volatile group id,
+  # so it's masked — asserting that membership IS present without pinning the id.
+  # Token via env (SCIM_TOKEN).
+  guard:
+    scim:
+      url: http://localhost:13000/scim/v2
+      tokenEnv: SCIM_TOKEN
+      resourceType: Users
+      filterAttr: userName
+      attributes: [userName, active, displayName, name/givenName, name/familyName, emails, groups]
+      mask: [groups]
+      # Cross-system CONSISTENCY (not a static golden): assert the provisioned SCIM
+      # userName equals the LOCAL-PART of the focus emailAddress (split on "@"). On a
+      # match the value collapses to a self-documenting token; a drift would diff.
+      # Demonstrates `consistentWith` on a SCIM target (same rule shape as ldap/db).
+      # Only applies when a midPoint focus named by the identifier exists — the direct
+      # SCIM CRUD scenarios have no focus, so their userName stays the literal value.
+      consistentWith:
+        userName:
+          from: emailAddress
+          delimited: { delimiter: "@", format: "{0}" }
+
+  # The SAME LDAP directory, viewed as the GROUP container — asserts the group
+  # OBJECT the App Access role provisions (its own metarole-driven projection), by
+  # cn under ou=groups. `member` is the stable account/placeholder DN set.
+  dir-groups:
+    ldap:
+      url: ldap://localhost:13890
+      bind:
+        dn: cn=admin,dc=example,dc=org
+        passwordEnv: LDAP_BIND_PASSWORD
+      containerDn: ou=groups,dc=example,dc=org
+      rdnAttr: cn
+      objectClasses: [groupOfNames]
+      attributes: [cn, member]
+
+  # The SAME SCIM provider, viewed as the GROUP endpoint — asserts the SCIM Group
+  # the role provisions, by displayName. `members` carries volatile user ids, so
+  # it's masked (assert membership present, not the id).
+  guard-groups:
+    scim:
+      url: http://localhost:13000/scim/v2
+      tokenEnv: SCIM_TOKEN
+      resourceType: Groups
+      filterAttr: displayName
+      attributes: [displayName, members]
+      mask: [members]
+
+# midPoint registered task the `trigger` step runs (run-now), keyed by system.
+triggers:
+  hr:
+    import: f1000000-0000-0000-0000-000000000005  # task-import-hr.xml
+
+# Whole-env snapshot-restore reset participant (the dev/idempotency tool; not used
+# by the single scenario below). Resets midPoint's DB volume; midPoint is the
+# cache-clear participant after the rollback.
+snapshot:
+  restore:
+    stop: [midpoint_data]
+    rollback: [midpoint_data]

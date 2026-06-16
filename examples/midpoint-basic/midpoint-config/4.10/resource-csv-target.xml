@@ -1,0 +1,118 @@
+<!--
+  Our deployment config under test: a CSV "App" target resource (OUTBOUND).
+
+  Provisioning direction: midPoint writes accounts to this CSV target via our
+  outbound mappings when a user is granted access (see role-app-target-access).
+  The skeleton verifies the REAL target file state after provisioning (brief
+  §6.1: assert real end-state, not a shadow/simulation).
+
+  Stable values:
+    - oid: fixed (CSV_TARGET_RESOURCE_OID)
+    - filePath: bind-mounted from CSV_HOST_DIR (infra/compose.test.yml)
+-->
+<resource xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+          xmlns:q="http://prism.evolveum.com/xml/ns/public/query-3"
+          xmlns:ri="http://midpoint.evolveum.com/xml/ns/public/resource/instance-3"
+          oid="c5222222-2222-2222-2222-222222222222">
+    <name>App CSV Target</name>
+    <description>CSV target resource for connected-test skeleton (outbound provisioning).</description>
+    <connectorRef>
+        <filter>
+            <q:text>connectorType = "com.evolveum.polygon.connector.csv.CsvConnector"</q:text>
+        </filter>
+    </connectorRef>
+    <connectorConfiguration xmlns:icfc="http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/connector-schema-3">
+        <icfc:configurationProperties
+                xmlns:cfg="http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/bundle/com.evolveum.polygon.connector-csv/com.evolveum.polygon.connector.csv.CsvConnector">
+            <cfg:multivalueDelimiter>;</cfg:multivalueDelimiter>
+            <cfg:fieldDelimiter>,</cfg:fieldDelimiter>
+            <cfg:quote>"</cfg:quote>
+            <cfg:filePath>/opt/midpoint/var/resource_files/app-target.csv</cfg:filePath>
+            <cfg:encoding>utf-8</cfg:encoding>
+            <cfg:uniqueAttribute>username</cfg:uniqueAttribute>
+        </icfc:configurationProperties>
+    </connectorConfiguration>
+
+    <schemaHandling>
+        <objectType>
+            <displayName>App Account</displayName>
+            <default>true</default>
+            <objectClass>ri:AccountObjectClass</objectClass>
+            <kind>account</kind>
+            <intent>default</intent>
+
+            <attribute>
+                <ref>ri:username</ref>
+                <outbound>
+                    <name>name to username</name>
+                    <source>
+                        <path>$focus/name</path>
+                    </source>
+                </outbound>
+            </attribute>
+            <attribute>
+                <ref>ri:firstname</ref>
+                <outbound>
+                    <name>givenName to firstname</name>
+                    <source>
+                        <path>$focus/givenName</path>
+                    </source>
+                </outbound>
+            </attribute>
+            <attribute>
+                <ref>ri:lastname</ref>
+                <outbound>
+                    <name>familyName to lastname</name>
+                    <source>
+                        <path>$focus/familyName</path>
+                    </source>
+                </outbound>
+            </attribute>
+            <attribute>
+                <ref>ri:email</ref>
+                <outbound>
+                    <name>emailAddress to email</name>
+                    <source>
+                        <path>$focus/emailAddress</path>
+                    </source>
+                </outbound>
+            </attribute>
+
+            <!--
+              Outbound activation: a deactivated focus disables the target account
+              instead of removing it (reversible offboarding / leave-of-absence).
+              No <source> is needed — an administrativeStatus outbound defaults its
+              source to the focus effectiveStatus, so an HR-driven lifecycleState=
+              suspended (effectiveStatus disabled) flows through. We DO keep this
+              explicit mapping: midPoint's built-in default activation mapping is
+              weak, so it provisions the initial status but does not reactively
+              deactivate an already-provisioned account; a normal-strength mapping
+              does. The capability below maps the status to the `disabled` column
+              (enabled -> "", disabled -> "true"); the account stays present, flagged.
+            -->
+            <activation>
+                <administrativeStatus>
+                    <outbound>
+                        <name>effective status to disabled column</name>
+                        <expression>
+                            <asIs/>
+                        </expression>
+                    </outbound>
+                </administrativeStatus>
+            </activation>
+        </objectType>
+    </schemaHandling>
+
+    <capabilities xmlns:cap="http://midpoint.evolveum.com/xml/ns/public/resource/capabilities-3">
+        <configured>
+            <cap:activation>
+                <cap:enabled>true</cap:enabled>
+                <cap:status>
+                    <cap:attribute>ri:disabled</cap:attribute>
+                    <cap:enableValue/>
+                    <cap:disableValue>true</cap:disableValue>
+                </cap:status>
+            </cap:activation>
+        </configured>
+    </capabilities>
+</resource>

@@ -1,0 +1,10 @@
+[
+  {
+    "dn": "uid=bravo,ou=people,dc=example,dc=org",
+    "uid": "bravo",
+    "cn": "Bravo Two",
+    "sn": "Two",
+    "givenName": "Bravo",
+    "mail": "bravo@example.com"
+  }
+]

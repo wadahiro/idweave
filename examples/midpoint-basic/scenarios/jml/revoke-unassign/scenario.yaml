@@ -1,0 +1,48 @@
+# Revoke — unassign a role (access revocation / re-certification).
+# Granting a role provisions the induced outbound account; revoking it must
+# deprovision that account. This is the access-removal half of the lifecycle
+# (e.g. a re-certification revoke, or a role no longer applicable) — distinct
+# from leaver-delete/leaver-disable, where the PERSON changes; here the person
+# stays and only the access is withdrawn.
+id: revoke-unassign
+requirement: REQ-JML-REVOKE-001
+description: >
+  jdoe is joined and granted "App Target Access" (target account provisioned). We
+  assert the account exists, then unassign the role; midPoint deprovisions the
+  induced account, removing it from the target while the user itself remains.
+
+setup:
+  # start from an empty target (it accumulates across scenarios; absent-asserts need it clean)
+  - clear-system: app-target
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: jdoe, deprovision: false }
+steps:
+  - set:
+      - login: jdoe
+        firstname: John
+        lastname: Doe
+        email: jdoe@example.com
+        disabled: ""
+  - trigger: import
+  - assign:
+      user: jdoe
+      role: App Target Access
+  # access granted: the outbound account is present
+  - expect:
+      accounts:
+        - system: app-target
+          identifier: jdoe
+          expected: expected/target.jdoe.json
+  - unassign:
+      user: jdoe
+      role: App Target Access
+  # access revoked: account deprovisioned, but the user remains
+  - expect:
+      objects:
+        - type: user
+          name: jdoe
+          expected: expected/user.jdoe.json
+      accounts:
+        - system: app-target
+          identifier: jdoe
+          absent: true

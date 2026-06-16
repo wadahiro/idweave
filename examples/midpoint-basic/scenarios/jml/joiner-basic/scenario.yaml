@@ -1,0 +1,35 @@
+# Joiner — basic.
+# A new HR source record creates a midPoint user (inbound mappings), then a role
+# grant provisions an outbound account. Declarative: ordered steps, no logic.
+id: joiner-basic
+requirement: REQ-JML-JOINER-001
+description: >
+  A new HR row is imported and, being unmatched, triggers addFocus — creating a
+  user with name/givenName/familyName/emailAddress/personalNumber from the source.
+  Granting "App Target Access" then provisions the outbound CSV account.
+
+setup:
+  # start from an empty target (it accumulates across scenarios; absent-asserts need it clean)
+  - clear-system: app-target
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: jdoe, deprovision: false }
+steps:
+  - set:
+      - login: jdoe
+        firstname: John
+        lastname: Doe
+        email: jdoe@example.com
+        disabled: ""
+  - trigger: import
+  - assign:
+      user: jdoe
+      role: App Target Access
+  - expect:
+      objects:
+        - type: user
+          name: jdoe
+          expected: expected/user.jdoe.json
+      accounts:
+        - system: app-target
+          identifier: jdoe
+          expected: expected/target.jdoe.json

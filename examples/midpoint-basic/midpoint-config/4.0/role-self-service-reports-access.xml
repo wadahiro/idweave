@@ -1,0 +1,19 @@
+<!--
+  Self-Service Reports Access — a SECOND requestable, approval-gated role, parallel
+  to Self-Service App Access. It exists so a requester can have TWO pending approvals
+  at once (one per role), which the bulk-approve / bulk-reject scenarios decide
+  together from the approver's work-item inbox. Like Self-Service App Access it is
+  requestable and assigns the approval metarole (so requesting it routes a work item
+  to the approver); it induces nothing — the approved ASSIGNMENT on the focus is the
+  asserted end-state (distinct from Self-Service App Access, which also provisions the
+  App target account).
+-->
+<role xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+      oid="c5999999-9999-9999-9999-999999999999">
+    <name>Self-Service Reports Access</name>
+    <description>Requestable, approval-gated role used (alongside Self-Service App Access) to drive bulk approve/reject.</description>
+    <requestable>true</requestable>
+    <assignment>
+        <targetRef oid="c5aaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" type="RoleType"/>
+    </assignment>
+</role>

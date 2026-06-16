@@ -1,0 +1,35 @@
+# Admin-driven role UNassignment through the GUI (unassign-ui).
+# An operator (administrator) removes a role from a user via the real edit-user
+# Wicket flow — find the user, open it, the Assignments panel, mark the role's
+# assignment with its inline "Unassign" action (the row flips to the removal
+# state), Save — the screen flow REST can't reproduce. The assignment to remove is
+# ARRANGED over REST (`assign`); the GUI drives the removal, the oracle asserts the
+# end-state (the user no longer carries the role) over REST.
+id: admin-unassign-role-ui
+requirement: REQ-JML-UNASSIGN-UI-001
+description: >
+  administrator removes "Catalog Browser" from a user through the edit-user GUI;
+  the user then no longer carries that role assignment (asserted via REST).
+
+setup:
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: uma, deprovision: false }
+steps:
+  - set:
+      - login: uma
+        firstname: Uma
+        lastname: Ops
+        email: uma@example.com
+        disabled: ""
+  - trigger: import
+  # arrange: give the user the assignment we are about to remove via the GUI
+  - assign: { user: uma, role: Catalog Browser }
+  - unassign-ui:
+      as: administrator
+      user: uma
+      role: Catalog Browser
+  - expect:
+      objects:
+        - type: user
+          name: uma
+          expected: expected/user.uma.json

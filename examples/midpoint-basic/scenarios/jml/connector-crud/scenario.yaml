@@ -1,0 +1,43 @@
+# Connector-mediated target CRUD.
+# Create, modify, then delete an object DIRECTLY on the target through midPoint's
+# connector (executeScript → ResourceObjectConverter), asserting each state with the
+# connector read. Every op runs at the resourceobjects layer, which uses the resource's
+# connector config but persists NO shadow — so the whole lifecycle is side-effect-free on
+# midPoint. No midPoint focus/provisioning is involved at all; idweave drives the target
+# itself. Re-runnable: create-resource-object registers the object for connector-delete at
+# the next reset (so a leftover from a failed run is idempotently pre-cleaned).
+id: connector-crud
+requirement: REQ-CX-CRUD-001
+description: >
+  Create an object on the App target through the connector, assert it, modify an
+  attribute and re-assert, then delete it and assert it is gone — all connector-mediated,
+  no shadow.
+
+setup:
+  # precondition: own only what we create — clear a leftover from a failed run
+  - delete-resource-object:
+      system: app-cx
+      identifier: cxcrud
+steps:
+  - create-resource-object:
+      system: app-cx
+      attributes: { username: cxcrud, firstname: Cx, lastname: Crud, email: cxcrud@example.com }
+  - expect-resource-object:
+      system: app-cx
+      identifier: cxcrud
+      expected: expected/created.json
+  - set-resource-object:
+      system: app-cx
+      identifier: cxcrud
+      set: { firstname: Changed }
+  - expect-resource-object:
+      system: app-cx
+      identifier: cxcrud
+      expected: expected/modified.json
+  - delete-resource-object:
+      system: app-cx
+      identifier: cxcrud
+  - expect-resource-object:
+      system: app-cx
+      identifier: cxcrud
+      absent: true

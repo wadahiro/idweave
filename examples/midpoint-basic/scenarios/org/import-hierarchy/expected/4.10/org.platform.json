@@ -1,0 +1,12 @@
+{
+  "name": "Platform",
+  "assignment": [
+    {
+      "target": "Engineering",
+      "type": "OrgType"
+    }
+  ],
+  "parentOrg": [
+    "Engineering"
+  ]
+}

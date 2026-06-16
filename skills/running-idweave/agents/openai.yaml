@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Run idweave'
+  short_description: 'Run idweave tests with the idw CLI — capture, run, snapshot, triage.'
+  default_prompt: 'Use the running-idweave skill to capture, review, and run idweave scenarios with the idw CLI (scoping, snapshots/reset, reports, triage).'

@@ -1,0 +1,19 @@
+{
+  "name": "gail",
+  "lifecycleState": "active",
+  "assignment": [
+    {
+      "target": "Catalog Browser",
+      "type": "RoleType"
+    },
+    {
+      "target": "Employee",
+      "type": "ArchetypeType"
+    }
+  ],
+  "emailAddress": "gail@example.com",
+  "fullName": "Gail Ops",
+  "givenName": "Gail",
+  "familyName": "Ops",
+  "personalNumber": "gail"
+}

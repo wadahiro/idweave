@@ -1,0 +1,44 @@
+# PER-ROLE validity: TWO roles requested in ONE cart, each given its OWN distinct
+# validity window via that role's Edit dialog in the checkout — the thing the bulk
+# "Custom length" panel (validity-comment) CANNOT do (it's one window for all).
+# The oracle asserts each granted assignment carries its own validFrom/validTo. A
+# distinct user (erin) keeps provisioning from colliding with the bulk scenario's
+# carol.
+id: request-validity-per-role
+requirement: REQ-WF-VALIDITY-002
+description: >
+  erin requests "Catalog App Access" (2035-03-04 → 2035-09-10) and "Catalog
+  Reports Access" (2040-01-15 → 2040-07-20) in one cart, each with its OWN
+  validity set via its Edit dialog; each granted assignment carries its window.
+setup:
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: erin, deprovision: false }
+steps:
+  - set:
+      - login: erin
+        firstname: Erin
+        lastname: Role
+        email: erin@example.com
+        disabled: ""
+        org: ""
+        roles: ""
+        password: Test1234!
+  - trigger: import
+  - request-ui:
+      as: erin
+      items:
+        - access: Catalog App Access
+          view: role-catalog
+          catalog: [Catalog Root, Cloud Services, Web Apps]
+          validFrom: "2035-03-04"
+          validTo: "2035-09-10"
+        - access: Catalog Reports Access
+          view: role-catalog
+          catalog: [Catalog Root, Cloud Services, Web Apps]
+          validFrom: "2040-01-15"
+          validTo: "2040-07-20"
+  - expect:
+      objects:
+        - type: user
+          name: erin
+          expected: expected/user.erin.json

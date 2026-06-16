@@ -1,0 +1,26 @@
+# Test-profile overlay for the dev stack.
+#
+# Two bind mounts into the midPoint container (both nested under the existing
+# `midpoint_home` named volume at /opt/midpoint/var; the more specific bind wins):
+#
+#  1. resource_files  — the path the CSV connector reads/writes (see resource
+#     filePath). Lets the harness write source CSV files midPoint reads, and read
+#     the provisioned target file — without a docker socket in any test code.
+#
+#  2. post-initial-objects — our config XML. midPoint natively imports objects
+#     here at startup, so `up` alone yields a configured stack (baseline baked
+#     in). The SAME directory is also re-appliable at runtime via the REST CLI
+#     (`idw import-config`) for a restart-free dev loop.
+#
+# Usage (paths relative to this file's dir, examples/infra/):
+#   docker compose -f examples/infra/docker-compose.yml -f examples/infra/compose.test.yml up -d
+
+services:
+  midpoint_server:
+    volumes:
+      - ../data/csv:/opt/midpoint/var/resource_files
+      - ../../midpoint-config/4.4:/opt/midpoint/var/post-initial-objects:ro
+      # Spring Boot props read from ${midpoint.home}/ — here, only to set
+      # wicket.no-serialization.enabled=true, which fixes 4.4's shopping-cart
+      # SearchPanel NPE (see the file's own comment).
+      - ./application.properties:/opt/midpoint/var/application.properties:ro

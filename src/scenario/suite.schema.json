@@ -1,0 +1,365 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/wadahiro/idweave/suite.schema.json",
+  "title": "Scenario suite manifest",
+  "description": "Shared description of the deployment under test: the external systems scenarios read/write and the midPoint tasks they trigger. Binds the logical names scenarios use to concrete systems (suite data, not engine config).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["systems"],
+  "definitions": {
+    "triggerBinding": {
+      "oneOf": [
+        { "type": "string", "description": "Registered task OID." },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["task"],
+          "properties": {
+            "task": { "type": "string", "description": "Registered task OID." },
+            "timeoutMs": { "type": "integer", "minimum": 0, "description": "Max ms to wait for this task's fresh run to finish — overrides POLL_TIMEOUT_MS for a slow/cold recon." }
+          }
+        }
+      ]
+    },
+    "csvSystem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fileName", "columns", "idColumn"],
+      "properties": {
+        "fileName": { "type": "string", "description": "File name under the host CSV dir." },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "Column names / header order."
+        },
+        "idColumn": { "type": "string", "description": "Identifier column for delta ops and account lookup." }
+      }
+    },
+    "midpointSystem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseUrlEnv", "usernameEnv", "passwordEnv", "version"],
+      "description": "A midPoint instance scenarios drive (REST + GUI) and a restore participant (cache-clear after rollback). Connection/credentials via env-var NAMES; version is PER INSTANCE (a deployment's midPoints may differ) and selects BOTH the cache-clear payload and the GUI page-object module.",
+      "properties": {
+        "baseUrlEnv": { "type": "string", "description": "Env var name holding the base URL (up to /midpoint)." },
+        "usernameEnv": { "type": "string", "description": "Env var name holding the admin username (may differ per environment)." },
+        "passwordEnv": { "type": "string", "description": "Env var name holding the admin password." },
+        "version": { "type": "string", "description": "midPoint major version (e.g. \"4.10\", \"4.4\") — selects the version-correct cache-clear payload AND the GUI reference page objects." },
+        "guiBaseUrlEnv": { "type": "string", "description": "Env var name holding the GUI base URL when it differs from baseUrlEnv (e.g. an SSO front-end on another origin). Omit when REST and GUI share the origin." },
+        "overrides": { "type": "string", "description": "Project page-object override module path (relative to the suite dir) for this instance's customised screens." },
+        "auth": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "description": "GUI login provider for THIS instance. Omitted/midpoint = the version's native form; keycloak = OIDC/Keycloak SSO login.",
+          "properties": {
+            "type": { "enum": ["midpoint", "keycloak"], "description": "midpoint (default) | keycloak (SSO)." }
+          }
+        }
+      }
+    },
+    "keycloakSystem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["urlEnv", "realmEnv", "clientIdEnv"],
+      "anyOf": [
+        { "required": ["secretEnv"] },
+        { "required": ["usernameEnv", "passwordEnv"] }
+      ],
+      "description": "A Keycloak instance (restore participant; realm/user/keys cache-clear after rollback). Admin connection via env-var NAMES — EITHER a service-account client_credentials grant (secretEnv) OR a password grant (admin-cli + master admin: usernameEnv/passwordEnv, authRealmEnv=master). Can ALSO be an assert-only target (read a realm user) — declare attributes/mask to opt in.",
+      "properties": {
+        "urlEnv": { "type": "string", "description": "Env var name holding the Keycloak base URL (incl. any servlet path)." },
+        "realmEnv": { "type": "string", "description": "Env var name holding the realm the admin operations TARGET (whose caches are cleared / users are read)." },
+        "clientIdEnv": { "type": "string", "description": "Env var name holding the admin client id (service-account client, or admin-cli for password grant)." },
+        "secretEnv": { "type": "string", "description": "Env var name holding the client secret (client_credentials grant). Omit for password grant." },
+        "usernameEnv": { "type": "string", "description": "Env var name holding the admin username (password grant, INSTEAD of secretEnv)." },
+        "passwordEnv": { "type": "string", "description": "Env var name holding the admin password (password grant)." },
+        "authRealmEnv": { "type": "string", "description": "Env var name holding the realm to AUTHENTICATE against (default: the target realm; master for admin-cli)." },
+        "attributes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Fields to project when reading this Keycloak as an assert target (allowlist). Each name matches a top-level user field (email/enabled/firstName/…) OR a custom realm-user attribute. Omit to capture all non-volatile fields."
+        },
+        "mask": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Field/attribute names whose volatile value is masked to a stable token (assert presence, not value). Case-sensitive."
+        },
+        "consistentWith": { "$ref": "#/definitions/consistentWith" }
+      }
+    },
+    "scimSystem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url"],
+      "anyOf": [
+        { "required": ["tokenEnv"] },
+        { "required": ["username", "passwordEnv"] }
+      ],
+      "description": "A SCIM 2.0 Service Provider, asserted read-only (midPoint provisions outbound; the end-state lives here). Fetches a resource by a SCIM filter (<filterAttr> eq \"<id>\"). Auth via EITHER a bearer token (tokenEnv) OR HTTP Basic (username + passwordEnv).",
+      "properties": {
+        "url": { "type": "string", "description": "Service Provider base URL incl. the version segment, e.g. https://host/scim/v2. No credential in it." },
+        "tokenEnv": { "type": "string", "description": "Bearer-token auth: env var name holding the token. Use this XOR Basic (username + passwordEnv)." },
+        "username": { "type": "string", "description": "HTTP Basic auth: the user name (not secret)." },
+        "passwordEnv": { "type": "string", "description": "HTTP Basic auth: env var name holding the password (the secret)." },
+        "resourceType": { "type": "string", "description": "Resource endpoint to query (default Users)." },
+        "filterAttr": { "type": "string", "description": "SCIM attribute the account identifier filters on (default userName)." },
+        "attributes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Attribute PATHS to project when asserting (allowlist). A path navigates the resource by slash (name/givenName, active); the output key IS the path. Omit to assert the whole resource minus volatile fields (id/meta/schemas)."
+        },
+        "mask": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Attribute paths whose volatile value is masked to a stable token (assert presence, not value). Case-sensitive."
+        },
+        "consistentWith": { "$ref": "#/definitions/consistentWith" }
+      }
+    },
+    "resourceSystem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["objectClass"],
+      "oneOf": [{ "required": ["name"] }, { "required": ["oid"] }],
+      "description": "Connector-mediated midPoint resource: read/drive a target object THROUGH midPoint's connector (REST -> model -> connector), so a system idweave has no native client for (incl. proprietary connectors) can still be asserted and ARRANGEd. Generic fallback (oracle mediated by midPoint); standardized protocols keep their direct readers. Identified at the connector level by objectClass; kind/intent/tag are optional refined-schema refinements. Addressed by a focus `owner` or a standalone `identifier`. Driven through the suite's midPoint; with several midPoints, `midpoint:` names the owning instance.",
+      "properties": {
+        "name": { "type": "string", "description": "midPoint resource NAME (resolved to its OID). Use this XOR oid." },
+        "oid": { "type": "string", "description": "midPoint resource OID (alternative to name)." },
+        "objectClass": { "type": "string", "description": "Native object class — the connector-level discriminator, e.g. ri:inetOrgPerson, ri:groupOfNames." },
+        "attributes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Shadow attributes to project when asserting (allowlist, matched by local name). Omit to capture all non-operational attributes."
+        },
+        "mask": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Attribute names whose volatile value is masked to a stable token (assert presence, not value)."
+        },
+        "identifierAttr": { "type": "string", "description": "How an `identifier` is matched: `__uid__` (the connector PRIMARY identifier, e.g. entryUUID / a CSV key column), `__name__` (the SECONDARY identifier, e.g. an LDAP DN; absent on some connectors), or a regular attribute name (default `name`)." },
+        "kind": { "enum": ["account", "entitlement", "generic"], "description": "Refined-schema refinement (optional)." },
+        "intent": { "type": "string", "description": "Refined-schema intent (optional) — disambiguates two object types sharing one objectClass." },
+        "tag": { "type": "string", "description": "Multiaccount discriminator (optional; midPoint 4.4+)." },
+        "midpoint": { "type": "string", "description": "Named midPoint instance (a suite.systems key) the resource is driven through — its version selects the connector-script dialect. Omit when the suite has a single midPoint; REQUIRED when several are declared." }
+      }
+    },
+    "ldapSystem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "bind", "containerDn", "rdnAttr", "objectClasses"],
+      "properties": {
+        "url": { "type": "string", "description": "URL with scheme — ldap:// (plain) or ldaps:// (TLS)." },
+        "bind": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["dn", "passwordEnv"],
+          "properties": {
+            "dn": { "type": "string", "description": "Bind principal (DN or UPN) — not a secret." },
+            "passwordEnv": { "type": "string", "description": "Name of the env var holding the bind password (the only secret)." }
+          }
+        },
+        "containerDn": { "type": "string", "description": "DN whose direct children are the accounts (washed/repopulated like a CSV file)." },
+        "rdnAttr": { "type": "string", "description": "RDN attribute, e.g. cn (AD) / uid (OpenLDAP). DN = <rdnAttr>=<row[rdnAttr]>,<containerDn>." },
+        "objectClasses": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "objectClass values for created entries; the first is also the reset filter class."
+        },
+        "baseAttrs": {
+          "type": "object",
+          "additionalProperties": { "type": ["string", "array"], "items": { "type": "string" } },
+          "description": "Fixed attributes on every entry, e.g. { \"userAccountControl\": \"544\" }."
+        },
+        "password": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from"],
+          "properties": {
+            "from": { "type": "string", "description": "Row attribute holding the cleartext password." },
+            "to": { "type": "string", "description": "Attribute receiving the encoded password (default unicodePwd)." }
+          },
+          "description": "Map a cleartext row attribute to a password attribute (AD unicodePwd: UTF-16LE, quoted)."
+        },
+        "attributes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Attributes to project when reading this system as a target (the assertion allowlist, like CSV columns). Omit to capture all non-operational attributes."
+        },
+        "mask": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Attribute names whose volatile value is masked to a stable token (assert presence, not value), e.g. x-externalRef. Case-insensitive."
+        },
+        "consistentWith": { "$ref": "#/definitions/consistentWith" }
+      }
+    },
+    "consistentWith": {
+      "type": "object",
+      "description": "Cross-system consistency (ldap attribute or db column): assert a (multi-)value equals a transform of a midPoint focus property — stronger than a static golden, since the value is volatile. The engine derives the expected from the focus at run time and compares as an order-independent, de-duplicated SET; on a match the value collapses to a token <consistent:<from>>, on a mismatch it diffs. Keyed by the attribute/column name.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from"],
+        "oneOf": [{ "required": ["delimited"] }],
+        "properties": {
+          "from": { "type": "string", "description": "Focus property path to derive the expected value(s) from (the account identifier is the user name), e.g. extension/externalRef. Multi-value supported." },
+          "listSeparator": {
+            "type": "string",
+            "description": "Use ONLY when the TARGET system can't store multiple values natively and packs them into a SINGLE field joined by this separator (e.g. a custom attribute holding 'a,b') — the string is split by this into a set before comparison. A genuinely multi-valued attribute (an LDAP multi-value attribute is already an array) does NOT need this. Either way the comparison is an order-independent, de-duplicated set."
+          },
+          "delimited": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["delimiter", "format"],
+            "description": "Transform method (externally tagged by this key; a future `regex` slots in beside it): split each `from` value by `delimiter` into positional fields, then build the expected value with `format` (referencing fields by name when `names` is set, else by 0-based index; literals pass through).",
+            "properties": {
+              "delimiter": { "type": "string", "description": "Splits each source value into positional fields." },
+              "names": { "type": "array", "items": { "type": "string" }, "description": "Optional names for the leading field positions, so `format` can use {name} (self-documenting) instead of {0}." },
+              "format": { "type": "string", "description": "The expected value, e.g. {a}/{b} or {0}/{1}." }
+            }
+          }
+        }
+      }
+    },
+    "dbSystem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "passwordEnv", "query"],
+      "properties": {
+        "url": { "type": "string", "description": "Connection URL; scheme selects the dialect (postgres:// default -> pg). No password in it." },
+        "passwordEnv": { "type": "string", "description": "Name of the env var holding the connection password (the only secret)." },
+        "query": { "type": "string", "description": "Parameterized SELECT; :id binds the lookup value. Returns the asserted row(s)." },
+        "update": { "type": "string", "description": "Optional parameterized UPDATE for the db-mutate step (rewind external mock state). Binds :id (via linkFrom, like query) and :value (the new value the step supplies). Use cast(:value as t) not :value::t so the :name parser isn't confused by ::. Omit on read-only systems." },
+        "columns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Columns to project when asserting (allowlist, like LDAP attributes). Omit to assert all returned columns."
+        },
+        "linkFrom": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Focus linkage for rows keyed by a value midPoint holds (not a stable id). The engine runs the query once per linking value (:id = each) and asserts the union as a sorted set. Source the value(s) from EITHER `path` (read live from the focus named by the account identifier) OR `capture` (a value a capture-focus step recorded earlier) — exactly one. Omit linkFrom entirely for a plain :id=identifier lookup.",
+          "properties": {
+            "path": { "type": "string", "description": "Slash path into the focus (named by the account identifier) to read the linking value(s) LIVE, e.g. extension/externalRef." },
+            "capture": { "type": "string", "description": "Name of a capture-focus slot holding the linking value(s) recorded earlier — to assert a row whose value the run since destroyed (e.g. a value removed by a scheduled task)." },
+            "type": { "type": "string", "enum": ["user", "role", "org", "service"], "description": "Focus type to read for `path` (default user)." }
+          },
+          "oneOf": [{ "required": ["path"] }, { "required": ["capture"] }]
+        },
+        "consistentWith": { "$ref": "#/definitions/consistentWith" }
+      }
+    }
+  },
+  "properties": {
+    "systems": {
+      "type": "object",
+      "description": "Systems of the deployment under test, keyed by the logical name scenarios reference. Each is exactly one of csv | ldap | db | scim | resource (external read/write or assert target; resource is connector-mediated via midPoint) or midpoint | keycloak (an instance — restore participant; keycloak may also be an assert target).",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "csv": { "$ref": "#/definitions/csvSystem" },
+          "ldap": { "$ref": "#/definitions/ldapSystem" },
+          "db": { "$ref": "#/definitions/dbSystem" },
+          "scim": { "$ref": "#/definitions/scimSystem" },
+          "resource": { "$ref": "#/definitions/resourceSystem" },
+          "midpoint": { "$ref": "#/definitions/midpointSystem" },
+          "keycloak": { "$ref": "#/definitions/keycloakSystem" }
+        },
+        "oneOf": [{ "required": ["csv"] }, { "required": ["ldap"] }, { "required": ["db"] }, { "required": ["scim"] }, { "required": ["resource"] }, { "required": ["midpoint"] }, { "required": ["keycloak"] }]
+      }
+    },
+    "triggers": {
+      "type": "object",
+      "description": "midPoint registered tasks the `trigger` step runs, keyed by system name (midPoint-specific).",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "recon": { "$ref": "#/definitions/triggerBinding", "description": "Reconciliation task: an OID string, or { task, timeoutMs }." },
+          "import": { "$ref": "#/definitions/triggerBinding", "description": "Import task: an OID string, or { task, timeoutMs }." }
+        }
+      }
+    },
+    "tasks": {
+      "type": "object",
+      "description": "Global registered midPoint tasks the `run-task` step runs, keyed by a logical name. Deployment-wide operational/scanner tasks (validity scan, cleanup), not tied to one system. Each value is a task OID.",
+      "additionalProperties": { "type": "string", "description": "Registered task OID." }
+    },
+    "defaultSystem": {
+      "type": "string",
+      "description": "System a mutate/trigger step uses when it omits `system:` and there is more than one."
+    },
+    "gui": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Cross-cutting GUI settings (named logins, per-principal passwords). The page-object version/overrides/auth are per driven system (systems.*.midpoint), not here.",
+      "properties": {
+        "logins": {
+          "type": "object",
+          "description": "Named logins for a suite that drives more than one login target (a midPoint dashboard, a Keycloak Account/Admin console). A login-ui step selects one by name with `to:`. Each is one (system, target route).",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "system": { "type": "string", "description": "System this login targets — its kind/auth implies the provider + page objects. Omit for the sole/default driveable system." },
+              "target": { "type": "string", "description": "Authenticated route to reach to trigger login (absolute, or a path joined to the GUI base). Default /self/dashboard." }
+            }
+          }
+        },
+        "principals": {
+          "type": "object",
+          "description": "Per-principal GUI login passwords (only the env-var name is suite data). A login not listed falls back to GUI_PASSWORD. Lets one suite drive the GUI as users with different passwords.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["passwordEnv"],
+            "properties": {
+              "passwordEnv": { "type": "string", "description": "Name of the env var holding this principal's GUI password (the secret)." }
+            }
+          }
+        }
+      }
+    },
+    "normalize": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Project-declared normalization for this deployment's data.",
+      "properties": {
+        "mask": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Focus-projection paths (a/b/c) whose volatile value is masked to a stable token."
+        }
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Whole-env snapshot-restore topology for the fast near-non-stop reset (any backend). Optional; env vars (SNAPSHOT_RESTORE_STOP / SNAPSHOT_RESTORE_ROLLBACK) override it, and the snapshot CLI works without it (falls back to stopping/resetting everything).",
+      "properties": {
+        "restore": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Stop only the data-owning service(s) and pause the rest, so the heavy app is frozen (not rebooted) and recovers via its DB connection pool. The CLI auto-falls back to a full restart if a paused service restarted since the baseline.",
+          "properties": {
+            "stop": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Compose service(s) to fully STOP around the reset (the rest are paused, not restarted)."
+            },
+            "rollback": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Compose volume KEY(s) to reset (btrfs → subvolume under SNAPSHOT_BTRFS_DIR; tar → <project>_<key> volume). Defaults to the `stop` names."
+            }
+          }
+        }
+      }
+    }
+  }
+}

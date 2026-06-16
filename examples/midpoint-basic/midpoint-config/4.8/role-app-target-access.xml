@@ -1,0 +1,18 @@
+<!--
+  Our deployment config under test: an access role that provisions an account
+  on the CSV App target. Assigning this role to a user constructs a target
+  account; the target resource's outbound mappings populate its attributes.
+  This is the RBAC -> provisioning behaviour the connected test verifies.
+-->
+<role xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+      oid="c5333333-3333-3333-3333-333333333333">
+    <name>App Target Access</name>
+    <description>Grants an account on the App CSV target (outbound provisioning).</description>
+    <inducement>
+        <construction>
+            <resourceRef oid="c5222222-2222-2222-2222-222222222222"/>
+            <kind>account</kind>
+            <intent>default</intent>
+        </construction>
+    </inducement>
+</role>

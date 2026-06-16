@@ -1,0 +1,22 @@
+{
+  "name": "jdoe",
+  "lifecycleState": "active",
+  "assignment": [
+    {
+      "target": "Employee",
+      "type": "ArchetypeType"
+    },
+    {
+      "target": "Engineering",
+      "type": "OrgType"
+    }
+  ],
+  "emailAddress": "jdoe@example.com",
+  "fullName": "John Doe",
+  "givenName": "John",
+  "familyName": "Doe",
+  "personalNumber": "jdoe",
+  "parentOrg": [
+    "Engineering"
+  ]
+}

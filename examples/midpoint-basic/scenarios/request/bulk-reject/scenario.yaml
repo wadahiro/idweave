@@ -1,0 +1,60 @@
+# Bulk REJECTION — alice requests TWO approval-gated roles in one request, so two
+# work items route to approver bob; bob selects BOTH and rejects them in ONE bulk
+# action from his inbox. Nothing is granted: neither role is assigned and no App
+# target account is provisioned. The negative counterpart to bulk-approve; asserted
+# over REST (the account is absent and the focus carries neither role).
+id: request-bulk-reject
+requirement: REQ-WF-BULK-REJECT-001
+description: >
+  alice requests "Self-Service App Access" and "Self-Service Reports Access"
+  together; approver bob selects both work items and rejects them in one bulk
+  action; alice is granted neither role and has no App target account.
+setup:
+  # start from an empty target (it accumulates across scenarios; absent-asserts need it clean)
+  - clear-system: app-target
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: alice, deprovision: false }
+  - clear-focus: { name: bob, deprovision: false }
+steps:
+  - set:
+      - login: alice
+        firstname: Alice
+        lastname: Req
+        email: alice@example.com
+        disabled: ""
+        org: ""
+        roles: ""
+        password: Test1234!
+      - login: bob
+        firstname: Bob
+        lastname: Apv
+        email: bob@example.com
+        disabled: ""
+        org: ""
+        roles: Approver
+        password: Test1234!
+  - trigger: import
+  # when: alice requests BOTH gated roles at once → two work items in bob's inbox
+  - request-ui:
+      as: alice
+      items:
+        - access: Self-Service App Access
+          view: all-roles
+        - access: Self-Service Reports Access
+          view: all-roles
+  # and: bob rejects both work items together (bulk select → one Reject)
+  - reject-ui:
+      as: bob
+      requests:
+        - Self-Service App Access
+        - Self-Service Reports Access
+  # then: nothing granted — alice has neither role and no App target account.
+  - expect:
+      objects:
+        - type: user
+          name: alice
+          expected: expected/user.alice.json
+      accounts:
+        - system: app-target
+          identifier: alice
+          absent: true

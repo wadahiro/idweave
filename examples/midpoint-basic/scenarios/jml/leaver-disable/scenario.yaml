@@ -1,0 +1,60 @@
+# Leaver — disable (deactivate, not delete).
+# The reversible offboarding path: leave-of-absence / suspension / a grace period
+# before deletion. The authoritative HR record is flagged disabled (not removed);
+# our inbound maps it to the focus administrativeStatus, and the target's outbound
+# activation deactivates the downstream account — which stays PRESENT but flagged
+# disabled (so access is cut yet restorable). Contrast leaver-delete, where the
+# HR row disappears and the account is removed entirely.
+id: leaver-disable
+requirement: REQ-JML-LEAVER-002
+description: >
+  jdoe is joined and granted access (target account provisioned, enabled). The HR
+  record is then updated with disabled=true and re-imported; the focus becomes
+  administratively disabled and that propagates outbound to the target account,
+  which remains present but flagged disabled (reversible deactivation).
+
+setup:
+  # start from an empty target (it accumulates across scenarios; absent-asserts need it clean)
+  - clear-system: app-target
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: jdoe, deprovision: false }
+steps:
+  - set:
+      - login: jdoe
+        firstname: John
+        lastname: Doe
+        email: jdoe@example.com
+        disabled: ""
+  - trigger: import
+  - assign:
+      user: jdoe
+      role: App Target Access
+  # assert the active baseline: focus enabled, target account enabled
+  - expect:
+      objects:
+        - type: user
+          name: jdoe
+          expected: expected/enabled.json
+      accounts:
+        - system: app-target
+          identifier: jdoe
+          expected: expected/target.enabled.json
+  # flip the source record to disabled and re-import
+  - replace:
+      - login: jdoe
+        firstname: John
+        lastname: Doe
+        email: jdoe@example.com
+        disabled: "true"
+  - trigger: import
+  # assert deactivation propagated: focus disabled, target account still present
+  # but flagged disabled (not removed)
+  - expect:
+      objects:
+        - type: user
+          name: jdoe
+          expected: expected/disabled.json
+      accounts:
+        - system: app-target
+          identifier: jdoe
+          expected: expected/target.disabled.json

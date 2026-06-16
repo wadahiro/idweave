@@ -1,0 +1,62 @@
+# Self-service request through a customised ROLE CATALOG, driven via the GUI.
+# The deployment publishes a role catalog rooted at the "Catalog Root" org
+# (systemConfiguration roleManagement/roleCatalogRef, set at post-init); a
+# requestable role "Catalog App Access" is a member of the leaf org "Web Apps".
+# alice (an Employee → can browse the catalog) drills the org tree to the leaf,
+# selects the role and requests it. It induces App Target Access (no approval
+# gate), so she is provisioned the App target account — asserted over REST.
+id: request-role-catalog
+requirement: REQ-WF-CATALOG-001
+description: >
+  alice browses the role-catalog org tree (Catalog Root → Cloud Services →
+  Web Apps), requests the "Catalog App Access" role published under the leaf org,
+  and is provisioned the App target account.
+
+setup:
+  # start from an empty target (it accumulates across scenarios; absent-asserts need it clean)
+  - clear-system: app-target
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: alice, deprovision: false }
+steps:
+  # given: alice, an Employee with a GUI password (so she can log in and browse).
+  - set:
+      - login: alice
+        firstname: Alice
+        lastname: Req
+        email: alice@example.com
+        disabled: ""
+        org: ""
+        roles: ""
+        password: Test1234!
+  - trigger: import
+  # when: alice requests the role from the catalog tree's leaf org
+  # and: the role is published under the LEAF org, not the intermediate one — so
+  # it's requestable at "Web Apps" but not at "Cloud Services" (catalog scope is
+  # one level). This visibility depends on where the role sits in the tree, which
+  # the REST end-state can't show, so it's asserted from the GUI.
+  - expect-requestable:
+      as: alice
+      view: role-catalog
+      catalog: [Catalog Root, Cloud Services]
+      absent: [Catalog App Access]
+  - expect-requestable:
+      as: alice
+      view: role-catalog
+      catalog: [Catalog Root, Cloud Services, Web Apps]
+      present: [Catalog App Access]
+  - request-ui:
+      as: alice
+      items:
+        - access: Catalog App Access
+          view: role-catalog
+          catalog: [Catalog Root, Cloud Services, Web Apps]
+  # then: she's provisioned the App target account (the role induces App Target Access)
+  - expect:
+      objects:
+        - type: user
+          name: alice
+          expected: expected/user.alice.json
+      accounts:
+        - system: app-target
+          identifier: alice
+          expected: expected/target.alice.json

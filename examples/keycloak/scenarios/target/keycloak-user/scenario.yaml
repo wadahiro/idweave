@@ -1,0 +1,17 @@
+# Keycloak as an ASSERT target — read a realm user over admin REST and assert its
+# projected fields. The `kc` system (suite.yaml) is used as a TARGET here, not just a
+# restore participant / login origin. The realm seeds `alice`
+# (infra/realm/idweave-realm.json); read-only, no reset, no midPoint.
+id: keycloak-user
+requirement: REQ-KC-TARGET-001
+description: >
+  Read the seeded alice over Keycloak admin REST and assert its projected fields
+  (username/email/firstName/lastName/enabled, per the kc system's attributes
+  allowlist) — demonstrating a keycloak system used as an expect target.
+
+steps:
+  - expect:
+      accounts:
+        - system: kc
+          identifier: alice
+          expected: expected/alice.json

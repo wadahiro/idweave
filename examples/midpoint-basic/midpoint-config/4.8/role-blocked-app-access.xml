@@ -1,0 +1,23 @@
+<!--
+  Blocked App Access — REQUESTABLE, but hard-blocked by policy. It shows up in
+  the self-service "Request access" catalog (requestable=true) and can be added
+  to the cart, but assigning it always violates the metarole-always-blocked
+  policy (enforced), so SUBMITTING the request fails with an error in the GUI and
+  nothing is provisioned. It induces App Target Access only so the negative test
+  is meaningful: if the block ever regressed, the target account WOULD appear —
+  the oracle asserts it does NOT.
+
+  Used by the request-blocked-by-policy scenario to assert the GUI error display.
+-->
+<role xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+      oid="c5e20000-0000-0000-0000-000000000002">
+    <name>Blocked App Access</name>
+    <description>Requestable but hard-blocked by policy — requesting it must show an error in the GUI.</description>
+    <requestable>true</requestable>
+    <assignment>
+        <targetRef oid="c5e20000-0000-0000-0000-000000000001" type="RoleType"/>
+    </assignment>
+    <inducement>
+        <targetRef oid="c5333333-3333-3333-3333-333333333333" type="RoleType"/>
+    </inducement>
+</role>

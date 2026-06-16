@@ -1,0 +1,17 @@
+{
+  "name": "jdoe",
+  "assignment": [
+    {
+      "target": "App Access",
+      "type": "RoleType"
+    },
+    {
+      "target": "Employee",
+      "type": "ArchetypeType"
+    }
+  ],
+  "emailAddress": "jdoe@example.com",
+  "fullName": "John Doe",
+  "givenName": "John",
+  "familyName": "Doe"
+}

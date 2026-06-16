@@ -1,0 +1,46 @@
+<!--
+  Metarole carrying an approval policy. A business role that ASSIGNS this
+  metarole becomes approval-requiring: requesting that role routes a work item
+  to the approver(s). The policy rule lives in the metarole's inducement so it
+  evaluates for the assignment of the role that holds the metarole (the
+  documented metarole-driven approval pattern; a rule placed directly in the
+  business role's own inducement does NOT fire on assignment).
+
+  Approvers = members of the standard Approver role
+  (00000000-0000-0000-0000-00000000000a). A plain approverRef to a RoleType is
+  NOT expanded to members, so we resolve members with an expression inside a
+  proper approval stage.
+-->
+<role xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+      oid="c5aaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa">
+    <name>metarole-request-approval</name>
+    <displayName>Metarole: requires approval</displayName>
+    <inducement>
+        <policyRule>
+            <name>Approval on assignment</name>
+            <policyConstraints>
+                <assignment/>
+            </policyConstraints>
+            <policyActions>
+                <approval>
+                    <approvalSchema>
+                        <stage>
+                            <name>Approver role members</name>
+                            <!--
+                              The approvers are the MEMBERS of the standard
+                              Approver role. A group reference is expanded into
+                              its members at work-item creation via
+                              <groupExpansion> — without it the role ref is not
+                              expanded and no work item is created.
+                            -->
+                            <approverRef oid="00000000-0000-0000-0000-00000000000a" type="RoleType"/>
+                            <evaluationStrategy>firstDecides</evaluationStrategy>
+                            <groupExpansion>onWorkItemCreation</groupExpansion>
+                            <outcomeIfNoApprovers>reject</outcomeIfNoApprovers>
+                        </stage>
+                    </approvalSchema>
+                </approval>
+            </policyActions>
+        </policyRule>
+    </inducement>
+</role>

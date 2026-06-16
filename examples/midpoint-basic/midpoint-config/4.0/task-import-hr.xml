@@ -1,0 +1,28 @@
+<!--
+  Registered import task for the HR CSV source.
+
+  The harness verifies your DEPLOYED tasks: a `trigger: import` on the hr system
+  runs THIS task (run-now) via triggers.hr.import in the suite. There is no
+  generic /resources/{oid}/import fallback, so every imported system ships its
+  own import task (symmetric with the recon task in task-recon-hr.xml).
+
+  4.0 NOTE: classic task schema (see task-recon-hr.xml). The import handler also
+  needs the target object class in the task extension (mext:objectclass).
+-->
+<task xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+      xmlns:ri="http://midpoint.evolveum.com/xml/ns/public/resource/instance-3"
+      oid="c5555555-5555-5555-5555-555555555555">
+    <name>HR Import</name>
+    <description>On-demand import of the HR CSV source. Triggered by the harness via run-now.</description>
+    <ownerRef oid="00000000-0000-0000-0000-000000000002" type="UserType"/>
+    <executionStatus>runnable</executionStatus>
+    <category>ImportingAccounts</category>
+    <!-- 4.0 import handler lives under .../synchronization/task/ (the bare
+         .../model/import/handler-3 URI is newer and has "No handler for URI" in 4.0). -->
+    <handlerUri>http://midpoint.evolveum.com/xml/ns/public/model/synchronization/task/import/handler-3</handlerUri>
+    <objectRef oid="c5111111-1111-1111-1111-111111111111" type="ResourceType"/>
+    <extension xmlns:mext="http://midpoint.evolveum.com/xml/ns/public/model/extension-3">
+        <mext:objectclass>ri:AccountObjectClass</mext:objectclass>
+    </extension>
+    <recurrence>single</recurrence>
+</task>

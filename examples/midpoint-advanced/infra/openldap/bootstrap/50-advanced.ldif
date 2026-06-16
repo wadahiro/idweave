@@ -1,0 +1,24 @@
+# Seeded once on first bootstrap (osixia v2 applies data/custom/*.ldif after the
+# base dc=example,dc=org entry). Just the two containers + a placeholder principal:
+#
+#   ou=people  — where midPoint provisions accounts (idweave's ldap containerDn;
+#                washed/repopulated per run like a CSV file).
+#   ou=groups  — where midPoint provisions each access role's group. NOT seeded
+#                with any group: the App Access role provisions its own group
+#                (see metarole-app-group.xml).
+#   cn=nobody  — placeholder member midPoint puts on a freshly provisioned
+#                groupOfNames (which forbids an empty member set). It lives OUTSIDE
+#                ou=people so idweave's per-run wash never removes it.
+
+dn: ou=people,dc=example,dc=org
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=groups,dc=example,dc=org
+objectClass: organizationalUnit
+ou: groups
+
+dn: cn=nobody,dc=example,dc=org
+objectClass: organizationalRole
+cn: nobody
+description: Placeholder member keeping a provisioned groupOfNames non-empty.

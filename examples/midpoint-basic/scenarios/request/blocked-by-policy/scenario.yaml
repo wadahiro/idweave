@@ -1,0 +1,51 @@
+# A requestable-but-policy-blocked role. "Blocked App Access" is requestable=true
+# (it shows in the catalog and can be added to the cart), but assigning it always
+# violates the ENFORCED metarole-always-blocked policy, so submitting the request
+# ("Request") fails with an error in the GUI and nothing is provisioned. We assert
+# BOTH the GUI error display and (over REST) that no target account appeared.
+#
+# This is the negative counterpart to expect-requestable: there the role isn't
+# even visible; here it IS requestable but the request is rejected at submit.
+# (This deployment publishes a role catalog, so the default view is the catalog
+# tree; the blocked role is a flat role, hence `view: all-roles`.)
+id: request-blocked-by-policy
+requirement: REQ-WF-POLICY-BLOCK-001
+description: >
+  alice requests "Blocked App Access" from the self-service screen; an enforced
+  policy rejects it and the GUI shows an error; no account is provisioned.
+
+setup:
+  # start from an empty target (it accumulates across scenarios; absent-asserts need it clean)
+  - clear-system: app-target
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: alice, deprovision: false }
+steps:
+  # given: a requester (alice), imported from HR with a GUI password
+  - set:
+      - login: alice
+        firstname: Alice
+        lastname: Req
+        email: alice@example.com
+        disabled: ""
+        org: ""
+        roles: ""
+        password: Test1234!
+  - trigger: import
+
+  # when: alice requests the blocked role. `expectError` flips the step to its
+  # negative mode: add to cart and submit, then assert it did NOT succeed and the
+  # GUI error feedback contains this substring (the role name appears in
+  # midPoint's policy-violation message).
+  - request-ui:
+      as: alice
+      items:
+        - access: Blocked App Access
+          view: all-roles
+      expectError: Blocked App Access
+
+  # then: nothing was provisioned — alice has no App target account.
+  - expect:
+      accounts:
+        - system: app-target
+          identifier: alice
+          absent: true

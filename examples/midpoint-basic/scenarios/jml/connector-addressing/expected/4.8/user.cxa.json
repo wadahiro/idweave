@@ -1,0 +1,19 @@
+{
+  "name": "cxa",
+  "lifecycleState": "active",
+  "assignment": [
+    {
+      "target": "App Target Access",
+      "type": "RoleType"
+    },
+    {
+      "target": "Employee",
+      "type": "ArchetypeType"
+    }
+  ],
+  "emailAddress": "cxa@example.com",
+  "fullName": "Cx Addr",
+  "givenName": "Cx",
+  "familyName": "Addr",
+  "personalNumber": "cxa"
+}

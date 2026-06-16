@@ -1,0 +1,36 @@
+{
+  "realm": "idweave",
+  "enabled": true,
+  "clients": [
+    {
+      "clientId": "idweave-admin",
+      "name": "idweave admin (service account)",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "idweave-admin-secret"
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-idweave-admin",
+      "enabled": true,
+      "serviceAccountClientId": "idweave-admin",
+      "clientRoles": {
+        "realm-management": ["realm-admin"]
+      }
+    },
+    {
+      "username": "alice",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "alice@example.com",
+      "firstName": "Alice",
+      "lastName": "Example",
+      "credentials": [{ "type": "password", "value": "alice-pw-1!", "temporary": false }]
+    }
+  ]
+}

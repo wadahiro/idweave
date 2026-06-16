@@ -1,0 +1,247 @@
+<!--
+  Our deployment config under test: a CSV "HR" source resource.
+
+  This is OUR configuration (inbound mappings + correlation + synchronization
+  reactions), adapted from the midPoint CSV HR sample. The skeleton exercises
+  the Joiner path: an unmatched source row -> addFocus creates a midPoint user
+  with attributes produced by our inbound mappings.
+
+  Two values are intentionally stable so import is idempotent and matches the
+  harness config:
+    - oid: fixed (CSV_RESOURCE_OID)
+    - connectorConfiguration/filePath: the path the CSV connector reads inside
+      the container, bind-mounted from CSV_HOST_DIR by infra/compose.test.yml.
+-->
+<resource xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+          xmlns:q="http://prism.evolveum.com/xml/ns/public/query-3"
+          xmlns:ri="http://midpoint.evolveum.com/xml/ns/public/resource/instance-3"
+          oid="c5111111-1111-1111-1111-111111111111">
+    <name>HR CSV Source</name>
+    <description>CSV source resource for connected-test skeleton (Joiner path).</description>
+    <connectorRef>
+        <filter>
+            <q:text>connectorType = "com.evolveum.polygon.connector.csv.CsvConnector"</q:text>
+        </filter>
+    </connectorRef>
+    <connectorConfiguration xmlns:icfc="http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/connector-schema-3">
+        <icfc:configurationProperties
+                xmlns:cfg="http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/bundle/com.evolveum.polygon.connector-csv/com.evolveum.polygon.connector.csv.CsvConnector">
+            <cfg:multivalueDelimiter>;</cfg:multivalueDelimiter>
+            <cfg:fieldDelimiter>,</cfg:fieldDelimiter>
+            <cfg:quote>"</cfg:quote>
+            <cfg:filePath>/opt/midpoint/var/resource_files/hr-source.csv</cfg:filePath>
+            <cfg:quoteMode>ALL</cfg:quoteMode>
+            <cfg:encoding>utf-8</cfg:encoding>
+            <cfg:uniqueAttribute>login</cfg:uniqueAttribute>
+        </icfc:configurationProperties>
+    </connectorConfiguration>
+
+    <schemaHandling>
+        <objectType>
+            <displayName>HR Account</displayName>
+            <default>true</default>
+            <objectClass>ri:AccountObjectClass</objectClass>
+            <kind>account</kind>
+
+            <!--
+              HR users are Employees. The Employee archetype induces the End user
+              role, giving them self-service GUI access (so they can request roles
+              from the screen).
+            -->
+            <focus>
+                <archetypeRef oid="c5888888-8888-8888-8888-888888888888"/>
+            </focus>
+
+            <attribute>
+                <ref>ri:login</ref>
+                <inbound>
+                    <name>Login to name</name>
+                    <target>
+                        <path>$focus/name</path>
+                    </target>
+                </inbound>
+                <inbound>
+                    <name>Login to personalNumber</name>
+                    <target>
+                        <path>$focus/personalNumber</path>
+                    </target>
+                </inbound>
+            </attribute>
+            <attribute>
+                <ref>ri:firstname</ref>
+                <inbound>
+                    <name>Firstname to givenName</name>
+                    <target>
+                        <path>$focus/givenName</path>
+                    </target>
+                </inbound>
+            </attribute>
+            <attribute>
+                <ref>ri:lastname</ref>
+                <inbound>
+                    <name>Lastname to familyName</name>
+                    <target>
+                        <path>$focus/familyName</path>
+                    </target>
+                </inbound>
+            </attribute>
+            <attribute>
+                <ref>ri:email</ref>
+                <inbound>
+                    <name>Email to emailAddress</name>
+                    <target>
+                        <path>$focus/emailAddress</path>
+                    </target>
+                </inbound>
+            </attribute>
+            <attribute>
+                <ref>ri:disabled</ref>
+                <inbound>
+                    <!--
+                      HR is INBOUND-authoritative. The disabled flag drives the
+                      focus BUSINESS LIFECYCLE (lifecycleState), not its
+                      administrativeStatus: administrativeStatus is the manual,
+                      operator-facing switch (an admin temporarily disabling an
+                      account in the GUI) and must stay free of source overwrites.
+                      lifecycleState=suspended makes the focus effectiveStatus
+                      disabled, which propagates outbound to deactivate accounts.
+                      Mapping to a plain inbound (no activation capability on this
+                      source) also means midPoint computes NO activation outbound
+                      here, so it never tries to modify the protected HR shadow.
+                    -->
+                    <name>Disabled flag to focus lifecycle</name>
+                    <expression>
+                        <script>
+                            <code>input == 'true' ? 'suspended' : 'active'</code>
+                        </script>
+                    </expression>
+                    <target>
+                        <path>$focus/lifecycleState</path>
+                    </target>
+                </inbound>
+            </attribute>
+            <attribute>
+                <ref>ri:org</ref>
+                <inbound>
+                    <!--
+                      The user's department names their org. Like the org tree's
+                      parent column, it drives an ASSIGNMENT to that OrgType
+                      (resolved by name) — midPoint then puts the user under the
+                      org (parentOrgRef). Blank org is skipped (no membership).
+                    -->
+                    <name>Department to org assignment</name>
+                    <strength>strong</strength>
+                    <expression>
+                        <assignmentTargetSearch>
+                            <targetType>OrgType</targetType>
+                            <filter>
+                                <q:equal>
+                                    <q:path>name</q:path>
+                                    <expression>
+                                        <script>
+                                            <code>input</code>
+                                        </script>
+                                    </expression>
+                                </q:equal>
+                            </filter>
+                        </assignmentTargetSearch>
+                    </expression>
+                    <target>
+                        <path>assignment</path>
+                    </target>
+                    <condition>
+                        <script>
+                            <code>input != null &amp;&amp; !input.trim().isEmpty()</code>
+                        </script>
+                    </condition>
+                </inbound>
+            </attribute>
+            <attribute>
+                <ref>ri:roles</ref>
+                <inbound>
+                    <!--
+                      Extra role memberships from HR (e.g. the approver gets the
+                      Approver role). Same name-resolved assignment pattern as the
+                      org column; blank is skipped.
+                    -->
+                    <name>Roles column to role assignments</name>
+                    <strength>strong</strength>
+                    <expression>
+                        <assignmentTargetSearch>
+                            <targetType>RoleType</targetType>
+                            <filter>
+                                <q:equal>
+                                    <q:path>name</q:path>
+                                    <expression>
+                                        <script>
+                                            <code>input</code>
+                                        </script>
+                                    </expression>
+                                </q:equal>
+                            </filter>
+                        </assignmentTargetSearch>
+                    </expression>
+                    <target>
+                        <path>assignment</path>
+                    </target>
+                    <condition>
+                        <script>
+                            <code>input != null &amp;&amp; !input.trim().isEmpty()</code>
+                        </script>
+                    </condition>
+                </inbound>
+            </attribute>
+            <attribute>
+                <ref>ri:password</ref>
+                <inbound>
+                    <!--
+                      Initial GUI password from HR (test fixture). Plaintext in
+                      the CSV; midPoint protects (hashes) it. Skipped when blank,
+                      so users that don't need to log in stay password-less.
+                    -->
+                    <name>Password column to credentials</name>
+                    <target>
+                        <path>$focus/credentials/password/value</path>
+                    </target>
+                    <condition>
+                        <script>
+                            <code>input != null &amp;&amp; !input.trim().isEmpty()</code>
+                        </script>
+                    </condition>
+                </inbound>
+            </attribute>
+
+            <correlation>
+                <correlators>
+                    <items>
+                        <name>Login correlation</name>
+                        <description>Correlation using employee login</description>
+                        <item>
+                            <ref>name</ref>
+                        </item>
+                    </items>
+                </correlators>
+            </correlation>
+
+            <synchronization>
+                <reaction>
+                    <name>Linked synchronize</name>                    <situation>linked</situation>
+                    <actions><synchronize/></actions>
+                </reaction>
+                <reaction>
+                    <name>Unmatched add focus</name>                    <situation>unmatched</situation>
+                    <actions><addFocus/></actions>
+                </reaction>
+                <reaction>
+                    <name>Deleted remove focus</name>                    <situation>deleted</situation>
+                    <actions><deleteFocus/></actions>
+                </reaction>
+                <reaction>
+                    <name>Unlinked link</name>                    <situation>unlinked</situation>
+                    <actions><link/></actions>
+                </reaction>
+            </synchronization>
+
+        </objectType>
+    </schemaHandling>
+</resource>

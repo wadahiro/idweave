@@ -1,0 +1,46 @@
+# Direct SCIM CRUD by idweave (no midPoint).
+# The SCIM twin of ldap-crud: idweave drives the SCIM (Atlassian Guard) endpoint
+# itself — create a User, assert it, PATCH an attribute, re-assert, delete it,
+# assert it is gone. The mutate verbs target the `guard` system; the engine's SCIM
+# source adapter maps the flat rows (slash paths -> nested SCIM JSON, "true"->bool)
+# onto POST/PATCH/DELETE. A leading `remove` keeps it re-runnable; a dedicated
+# userName keeps it clear of the provisioning scenario's user.
+id: scim-crud
+requirement: REQ-ADVANCED-SCIM-CRUD-001
+description: >
+  Create scimcrud directly in the SCIM endpoint, assert it, change its displayName,
+  re-assert, then delete it and assert absence — all driven by idweave against the
+  Service Provider.
+
+setup:
+  - remove: [scimcrud]
+    system: guard
+steps:
+  - add:
+      - userName: scimcrud
+        name/givenName: Scim
+        name/familyName: Crud
+        displayName: Scim Crud
+        active: "true"
+    system: guard
+  - expect:
+      accounts:
+        - system: guard
+          identifier: scimcrud
+          expected: expected/created.json
+  - replace:
+      - userName: scimcrud
+        displayName: Scim Crud Modified
+    system: guard
+  - expect:
+      accounts:
+        - system: guard
+          identifier: scimcrud
+          expected: expected/modified.json
+  - remove: [scimcrud]
+    system: guard
+  - expect:
+      accounts:
+        - system: guard
+          identifier: scimcrud
+          absent: true

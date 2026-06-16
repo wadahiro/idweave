@@ -1,0 +1,32 @@
+<!--
+  Metarole carrying a HARD-ENFORCED policy that always blocks assignment. A
+  business role that ASSIGNS this metarole becomes un-assignable: when that role
+  is assigned to a user the unconditional <assignment/> constraint matches, and
+  because the action is <enforcement/> the operation is REJECTED with a policy
+  violation (surfaced as an error in the request-access UI).
+
+  Same metarole-driven pattern as metarole-request-approval: the rule lives in
+  the metarole's inducement so it evaluates for the assignment of the role that
+  HOLDS the metarole (a rule placed directly in the business role's own
+  inducement does NOT fire on assignment), and it fires on the USER's request of
+  that role — not on importing the role object itself.
+
+  Used to test that the GUI shows an error when a requestable-but-policy-blocked
+  role is requested.
+-->
+<role xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+      oid="c5e20000-0000-0000-0000-000000000001">
+    <name>metarole-always-blocked</name>
+    <displayName>Metarole: always blocked</displayName>
+    <inducement>
+        <policyRule>
+            <name>Block on assignment</name>
+            <policyConstraints>
+                <assignment/>
+            </policyConstraints>
+            <policyActions>
+                <enforcement/>
+            </policyActions>
+        </policyRule>
+    </inducement>
+</role>

@@ -1,0 +1,30 @@
+<!--
+  Registered import task for the Org CSV source.
+
+  Demonstrates testing a DEPLOYED import task object rather than midPoint's
+  generic /resources/{oid}/import endpoint: the suite wires this task's OID as
+  the org source's importTaskOid, so an `import` step on `source: org` runs THIS
+  task (run-now) and the harness verifies the configured task actually works.
+  (The hr source has no importTaskOid, so it still uses the generic endpoint —
+  the example exercises both paths.)
+
+  4.0 NOTE: classic task schema (see task-recon-hr.xml). The import handler also
+  needs the target object class in the task extension (mext:objectclass).
+-->
+<task xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+      xmlns:ri="http://midpoint.evolveum.com/xml/ns/public/resource/instance-3"
+      oid="c5777777-7777-7777-7777-777777777777">
+    <name>Org Import</name>
+    <description>On-demand import of the Org CSV source. Triggered by the harness via run-now.</description>
+    <ownerRef oid="00000000-0000-0000-0000-000000000002" type="UserType"/>
+    <executionStatus>runnable</executionStatus>
+    <category>ImportingAccounts</category>
+    <!-- 4.0 import handler lives under .../synchronization/task/ (the bare
+         .../model/import/handler-3 URI is newer and has "No handler for URI" in 4.0). -->
+    <handlerUri>http://midpoint.evolveum.com/xml/ns/public/model/synchronization/task/import/handler-3</handlerUri>
+    <objectRef oid="c5666666-6666-6666-6666-666666666666" type="ResourceType"/>
+    <extension xmlns:mext="http://midpoint.evolveum.com/xml/ns/public/model/extension-3">
+        <mext:objectclass>ri:AccountObjectClass</mext:objectclass>
+    </extension>
+    <recurrence>single</recurrence>
+</task>

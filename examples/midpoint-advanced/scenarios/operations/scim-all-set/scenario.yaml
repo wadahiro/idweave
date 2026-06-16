@@ -1,0 +1,45 @@
+# Whole-set assertion on a SCIM target (`expect.accounts` with `all: true`).
+# The SCIM twin of ldap-all-set: idweave drives the SCIM (Atlassian Guard) endpoint
+# itself — start from an EMPTY endpoint (clear-system), add exactly two Users, then
+# assert the FULL set of resources is precisely those two (order-independent). Remove
+# one and re-assert; clear and assert the set is empty.
+id: scim-all-set
+requirement: REQ-ADVANCED-SCIM-ALL-001
+description: >
+  Assert the entire SCIM Users set with `all: true`: two resources, then one after a
+  remove, then none after a clear — order-independent, all driven by idweave against
+  the Service Provider.
+
+setup:
+  - clear-system: guard
+steps:
+  - add:
+      - userName: alpha
+        name/givenName: Alpha
+        name/familyName: One
+        displayName: Alpha One
+        active: "true"
+      - userName: bravo
+        name/givenName: Bravo
+        name/familyName: Two
+        displayName: Bravo Two
+        active: "true"
+    system: guard
+  - expect:
+      accounts:
+        - system: guard
+          all: true
+          expected: expected/all-two.json
+  - remove: [alpha]
+    system: guard
+  - expect:
+      accounts:
+        - system: guard
+          all: true
+          expected: expected/all-one.json
+  - clear-system: guard
+  - expect:
+      accounts:
+        - system: guard
+          all: true
+          expected: expected/all-empty.json

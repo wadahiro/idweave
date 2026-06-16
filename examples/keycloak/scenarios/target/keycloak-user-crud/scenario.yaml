@@ -1,0 +1,48 @@
+# Keycloak as a CRUD SOURCE — idweave drives a realm user over admin REST as a test
+# fixture (add/replace/remove), then asserts the real end-state by reading it back.
+# The `kc` system (suite.yaml) is driven here as a source, not just an assert target /
+# restore participant. Known top-level fields map straight to the user representation;
+# a leading `remove` keeps it re-runnable. No midPoint involved.
+#
+# `set`/`reset` (a blanket realm wipe) are intentionally unsupported — a realm also
+# holds admin/service accounts — so this uses per-user add/replace/remove.
+id: keycloak-user-crud
+requirement: REQ-KC-SOURCE-CRUD-001
+description: >
+  Create kccrud directly in the Keycloak realm, assert its projected fields, change
+  its firstName (replace), re-assert, then delete it and assert absence — all driven
+  by idweave against the realm over admin REST.
+
+setup:
+  # Idempotent pre-clean so a leftover from a failed run doesn't fail the add.
+  - remove: [kccrud]
+    system: kc
+steps:
+  - add:
+      - username: kccrud
+        email: kccrud@example.com
+        firstName: KC
+        lastName: Crud
+        enabled: "true"
+    system: kc
+  - expect:
+      accounts:
+        - system: kc
+          identifier: kccrud
+          expected: expected/created.json
+  - replace:
+      - username: kccrud
+        firstName: Kacey
+    system: kc
+  - expect:
+      accounts:
+        - system: kc
+          identifier: kccrud
+          expected: expected/modified.json
+  - remove: [kccrud]
+    system: kc
+  - expect:
+      accounts:
+        - system: kc
+          identifier: kccrud
+          absent: true

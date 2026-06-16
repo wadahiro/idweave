@@ -1,0 +1,115 @@
+<!--
+  OpenLDAP target resource (OUTBOUND) — provisioned via midPoint's bundled
+  Evolveum LDAP connector (com.evolveum.polygon.connector.ldap.LdapConnector).
+
+  Accounts are inetOrgPerson entries under ou=people,dc=example,dc=org. The
+  Employee archetype induces this account, so every imported HR user is
+  provisioned here at join. The access role layers the app-users group membership
+  on top (see role-app-access.xml / the group entitlement below).
+
+  Connects over the docker network to openldap:3890 (the v2 image's non-privileged
+  port); idweave asserts the same directory from the host via the published port.
+-->
+<resource xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+          xmlns:q="http://prism.evolveum.com/xml/ns/public/query-3"
+          xmlns:ri="http://midpoint.evolveum.com/xml/ns/public/resource/instance-3"
+          oid="f1000000-0000-0000-0000-000000000002">
+    <name>OpenLDAP Target</name>
+    <description>OpenLDAP target resource for the advanced example (outbound provisioning).</description>
+    <connectorRef>
+        <filter>
+            <q:text>connectorType = "com.evolveum.polygon.connector.ldap.LdapConnector"</q:text>
+        </filter>
+    </connectorRef>
+    <connectorConfiguration xmlns:icfc="http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/connector-schema-3">
+        <icfc:configurationProperties
+                xmlns:cfg="http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/bundle/com.evolveum.polygon.connector-ldap/com.evolveum.polygon.connector.ldap.LdapConnector">
+            <cfg:host>openldap</cfg:host>
+            <cfg:port>3890</cfg:port>
+            <cfg:bindDn>cn=admin,dc=example,dc=org</cfg:bindDn>
+            <cfg:bindPassword>adminpassword</cfg:bindPassword>
+            <cfg:baseContext>dc=example,dc=org</cfg:baseContext>
+            <cfg:vlvSortAttribute>uid</cfg:vlvSortAttribute>
+            <cfg:pagingStrategy>auto</cfg:pagingStrategy>
+        </icfc:configurationProperties>
+    </connectorConfiguration>
+
+    <schemaHandling>
+        <objectType>
+            <displayName>LDAP Account</displayName>
+            <default>true</default>
+            <kind>account</kind>
+            <intent>default</intent>
+            <objectClass>ri:inetOrgPerson</objectClass>
+
+            <!-- DN = uid=<name>,ou=people,dc=example,dc=org (the account's location). -->
+            <attribute>
+                <ref>ri:dn</ref>
+                <outbound>
+                    <name>name to dn</name>
+                    <source><path>$focus/name</path></source>
+                    <expression>
+                        <script>
+                            <code>'uid=' + name + ',ou=people,dc=example,dc=org'</code>
+                        </script>
+                    </expression>
+                </outbound>
+            </attribute>
+            <attribute>
+                <ref>ri:uid</ref>
+                <outbound>
+                    <name>name to uid</name>
+                    <source><path>$focus/name</path></source>
+                </outbound>
+            </attribute>
+            <attribute>
+                <ref>ri:cn</ref>
+                <outbound>
+                    <name>fullName to cn</name>
+                    <source><path>$focus/fullName</path></source>
+                </outbound>
+            </attribute>
+            <attribute>
+                <ref>ri:sn</ref>
+                <outbound>
+                    <name>familyName to sn</name>
+                    <source><path>$focus/familyName</path></source>
+                </outbound>
+            </attribute>
+            <attribute>
+                <ref>ri:givenName</ref>
+                <outbound>
+                    <name>givenName to givenName</name>
+                    <source><path>$focus/givenName</path></source>
+                </outbound>
+            </attribute>
+            <attribute>
+                <ref>ri:mail</ref>
+                <outbound>
+                    <name>emailAddress to mail</name>
+                    <source><path>$focus/emailAddress</path></source>
+                </outbound>
+            </attribute>
+
+            <!-- Group membership: the access role associates the account into the
+                 app-users group (a groupOfNames whose `member` holds account DNs).
+                 The memberof overlay then maintains the account's memberOf. -->
+            <association>
+                <ref>ri:group</ref>
+                <displayName>LDAP group membership</displayName>
+                <kind>entitlement</kind>
+                <intent>group</intent>
+                <direction>objectToSubject</direction>
+                <associationAttribute>ri:member</associationAttribute>
+                <valueAttribute>ri:dn</valueAttribute>
+            </association>
+        </objectType>
+
+        <objectType>
+            <displayName>LDAP Group</displayName>
+            <kind>entitlement</kind>
+            <intent>group</intent>
+            <objectClass>ri:groupOfNames</objectClass>
+        </objectType>
+    </schemaHandling>
+</resource>

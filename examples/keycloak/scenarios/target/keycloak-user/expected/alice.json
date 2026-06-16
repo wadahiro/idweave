@@ -1,0 +1,7 @@
+{
+  "username": "alice",
+  "email": "alice@example.com",
+  "firstName": "Alice",
+  "lastName": "Example",
+  "enabled": true
+}

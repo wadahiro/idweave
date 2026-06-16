@@ -1,0 +1,9 @@
+{
+  "dn": "uid=pdoe,ou=people,dc=example,dc=org",
+  "uid": "pdoe",
+  "cn": "Paula Doe",
+  "sn": "Doe",
+  "givenName": "Paula",
+  "mail": "pdoe@example.com",
+  "memberOf": "cn=App Access,ou=groups,dc=example,dc=org"
+}

@@ -1,0 +1,32 @@
+{
+  "name": "erin",
+  "lifecycleState": "active",
+  "assignment": [
+    {
+      "activation": {
+        "validFrom": "2035-03-04T00:00:00.000Z",
+        "validTo": "2035-09-10T00:00:00.000Z"
+      },
+      "target": "Catalog App Access",
+      "type": "RoleType"
+    },
+    {
+      "activation": {
+        "validFrom": "2040-01-15T00:00:00.000Z",
+        "validTo": "2040-07-20T00:00:00.000Z"
+      },
+      "target": "Catalog Reports Access",
+      "type": "RoleType"
+    },
+    {
+      "target": "Employee",
+      "type": "ArchetypeType"
+    }
+  ],
+  "activation": {
+    "lockoutStatus": "normal"
+  },
+  "emailAddress": "erin@example.com",
+  "givenName": "Erin",
+  "familyName": "Role"
+}

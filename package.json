@@ -1,0 +1,74 @@
+{
+  "name": "idweave",
+  "version": "0.0.1",
+  "private": true,
+  "description": "idweave — a connected test harness that verifies your IAM landscape (midPoint, Keycloak, downstream targets) behaves as intended: declarative scenarios asserted against the real end-state.",
+  "keywords": [
+    "midpoint",
+    "keycloak",
+    "iam",
+    "identity",
+    "provisioning",
+    "scim",
+    "ldap",
+    "e2e",
+    "testing",
+    "test-harness"
+  ],
+  "license": "Apache-2.0",
+  "author": "Hiroyuki Wada",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wadahiro/idweave.git"
+  },
+  "homepage": "https://github.com/wadahiro/idweave#readme",
+  "bugs": "https://github.com/wadahiro/idweave/issues",
+  "type": "module",
+  "bin": {
+    "idw": "bin/idw.mjs",
+    "idweave": "bin/idw.mjs"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "npm@10.9.2",
+  "files": [
+    "bin",
+    "src",
+    "!src/**/*.test.ts",
+    ".env.example"
+  ],
+  "scripts": {
+    "cli": "tsx src/cli.ts",
+    "test": "vitest run examples/",
+    "test:watch": "vitest examples/",
+    "test:unit": "vitest run src/"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "diff": "^9.0.0",
+    "knex": "^3.2.10",
+    "ldapts": "^8.1.8",
+    "pg": "^8.21.0",
+    "picocolors": "^1.1.1",
+    "playwright": "^1.60.0",
+    "tsx": "^4.22.4",
+    "yaml": "^2.6.1"
+  },
+  "devDependencies": {
+    "@types/diff": "^8.0.0",
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.20.0",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.0"
+  },
+  "overrides": {
+    "esbuild": "0.28.1"
+  }
+}

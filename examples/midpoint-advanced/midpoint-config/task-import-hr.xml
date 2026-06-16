@@ -1,0 +1,22 @@
+<!--
+  Registered import task for the HR CSV source. A `trigger: import` on the hr
+  system runs THIS task (run-now) via triggers.hr.import in the suite (no generic
+  fallback). Single-run runnable: closes after each run, re-run on demand.
+-->
+<task xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+      oid="f1000000-0000-0000-0000-000000000005">
+    <name>HR Import</name>
+    <description>On-demand import of the HR CSV source. Triggered by the harness via run-now.</description>
+    <executionState>runnable</executionState>
+    <activity>
+        <work>
+            <import>
+                <resourceObjects>
+                    <resourceRef oid="f1000000-0000-0000-0000-000000000001"/>
+                    <kind>account</kind>
+                    <intent>default</intent>
+                </resourceObjects>
+            </import>
+        </work>
+    </activity>
+</task>

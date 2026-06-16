@@ -1,0 +1,13 @@
+{
+  "name": "uma",
+  "lifecycleState": "active",
+  "assignment": [
+    {
+      "target": "Employee",
+      "type": "ArchetypeType"
+    }
+  ],
+  "emailAddress": "uma@example.com",
+  "givenName": "Uma",
+  "familyName": "Ops"
+}

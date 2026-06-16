@@ -1,0 +1,45 @@
+<!--
+  Enable the self-service ROLE CATALOG rooted at the "Catalog Root" org. 4.0/4.4
+  use the (old) shopping-cart UI, configured via systemConfiguration
+  roleManagement/roleCatalogRef. Applied as an idempotent post-init executeScript
+  (a delta `replace`, so re-running just re-sets the same value) rather than a
+  full-object PUT that would clobber the rest of systemConfiguration.
+-->
+<executeScript xmlns="http://midpoint.evolveum.com/xml/ns/public/model/scripting-3"
+               xmlns:c="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <action>
+        <type>execute-script</type>
+        <parameter>
+            <name>script</name>
+            <c:value xsi:type="c:ScriptExpressionEvaluatorType">
+                <c:code><![CDATA[
+                    import com.evolveum.midpoint.xml.ns._public.common.common_3.*
+
+                    // Recompute the catalog orgs + role so their parentOrgRef /
+                    // membership (the hierarchy the catalog tree renders) is
+                    // projected — a plain import doesn't always compute it. Idempotent.
+                    for (oid in ['c5e10000-0000-0000-0000-000000000001',
+                                 'c5e10000-0000-0000-0000-000000000002',
+                                 'c5e10000-0000-0000-0000-000000000003']) {
+                        midpoint.recompute(OrgType.class, oid)
+                    }
+                    midpoint.recompute(RoleType.class, 'c5cccccc-cccc-cccc-cccc-cccccccccccc')
+                    midpoint.recompute(RoleType.class, 'c5eeeeee-eeee-eeee-eeee-eeeeeeeeeeee')
+
+                    // Point the self-service role catalog at the Catalog Root org.
+                    rootRef = new ObjectReferenceType()
+                    rootRef.setOid('c5e10000-0000-0000-0000-000000000001')
+                    rootRef.setType(OrgType.COMPLEX_TYPE)
+                    delta = midpoint.deltaFor(SystemConfigurationType.class)
+                        .item(SystemConfigurationType.F_ROLE_MANAGEMENT, RoleManagementConfigurationType.F_ROLE_CATALOG_REF)
+                        .replace(rootRef.asReferenceValue())
+                        .asObjectDeltas('00000000-0000-0000-0000-000000000001')
+                    midpoint.modifyObject(delta)
+                    log.info("IDWEAVE: role catalog root set + catalog orgs recomputed")
+                ]]></c:code>
+            </c:value>
+        </parameter>
+        <parameter><name>forWholeInput</name><c:value>true</c:value></parameter>
+    </action>
+</executeScript>

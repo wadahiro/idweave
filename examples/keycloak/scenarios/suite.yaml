@@ -1,0 +1,37 @@
+# Suite manifest for the independent Keycloak example.
+#
+# One system: a `keycloak` instance. It is a snapshot-restore PARTICIPANT (after a
+# rollback the afterRestore hook clears its realm/user/keys caches over admin REST)
+# AND — via the `attributes` allowlist below — an ASSERT-ONLY target: an
+# `expect.accounts` step reads a realm user over admin REST and asserts the projected
+# fields (the `target/keycloak-user` scenario). Admin connection via env-var NAMES;
+# only the secret is a secret. The realm/user/keys cache-clear on snapshot-restore is the
+# afterRestore hook (src/scenario/restore.ts); snapshot/restore is a standalone
+# dev/manual tool (make snapshot-build/-restore EXAMPLE=keycloak), not wired into scenario runs.
+systems:
+  kc:
+    keycloak:
+      urlEnv: KEYCLOAK_ADMIN_URL
+      realmEnv: KEYCLOAK_ADMIN_REALM
+      clientIdEnv: KEYCLOAK_ADMIN_CLIENT_ID
+      secretEnv: KEYCLOAK_ADMIN_SECRET
+      # Assert-target projection: the fields an expect.accounts step pins (allowlist).
+      attributes: [username, email, firstName, lastName, enabled]
+
+# Near-non-stop snapshot-restore: stop + reset only the dedicated Keycloak postgres
+# volume; Keycloak itself is paused (frozen, not rebooted) so its in-memory caches
+# survive the rollback and the afterRestore cache-clear is what reconciles them.
+snapshot:
+  restore:
+    stop: [keycloak_data]
+    rollback: [keycloak_data]
+
+# Named logins for the login-ui smokes. Each is one (system, target route) a
+# `login-ui` step picks by name with `to:`. The `system` is the Keycloak instance
+# above (`kc`) — its kind selects the login-only Keycloak page objects, so NO
+# midPoint version is involved. Both stock consoles use the single-page Keycloak
+# login; the provider auto-detects single-page vs identity-first.
+gui:
+  logins:
+    account: { system: kc, target: /realms/idweave/account }  # Account Console (idweave realm)
+    admin:   { system: kc, target: /admin/ }                        # Admin Console (master realm)

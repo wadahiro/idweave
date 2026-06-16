@@ -1,0 +1,49 @@
+# Direct LDAP CRUD by idweave (no midPoint).
+# idweave drives the LDAP directory itself as a test fixture — create an entry,
+# assert it, modify an attribute, re-assert, delete it, assert it is gone. The
+# mutate verbs (add/replace/remove) target the `dir` system directly; the same
+# `expect.accounts` assertion reads the real entry. A leading `remove` (in setup)
+# makes the scenario re-runnable — the suite has no implicit reset, each scenario
+# owns its data. A dedicated identifier keeps it clear of other scenarios' accounts.
+id: ldap-crud
+requirement: REQ-ADVANCED-LDAP-CRUD-001
+description: >
+  Create crudtest directly in LDAP, assert it, change its mail, re-assert, then
+  delete it and assert absence — all driven by idweave against the directory.
+
+setup:
+  # Pre-clean (idempotent) so a leftover from a failed run doesn't fail the add.
+  - remove: [crudtest]
+    system: dir
+steps:
+  - add:
+      - uid: crudtest
+        cn: Crud Test
+        sn: Test
+        givenName: Crud
+        mail: crud@example.com
+    system: dir
+  - expect:
+      accounts:
+        - system: dir
+          identifier: crudtest
+          expected: expected/created.json
+  - replace:
+      - uid: crudtest
+        cn: Crud Test
+        sn: Test
+        givenName: Crud
+        mail: changed@example.com
+    system: dir
+  - expect:
+      accounts:
+        - system: dir
+          identifier: crudtest
+          expected: expected/modified.json
+  - remove: [crudtest]
+    system: dir
+  - expect:
+      accounts:
+        - system: dir
+          identifier: crudtest
+          absent: true

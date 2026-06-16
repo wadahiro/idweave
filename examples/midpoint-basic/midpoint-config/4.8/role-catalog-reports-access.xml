@@ -1,0 +1,18 @@
+<!--
+  A SECOND requestable role published in the role catalog under the "Web Apps"
+  leaf org (member of it, like Catalog App Access), so the per-role validity
+  scenario can request TWO roles in one cart and give EACH its own validity
+  window — the thing only the per-role Edit dialog (not the bulk panel) can do.
+  Plain access (no inducement): the assertable result is the granted assignment's
+  validity on the requester, so it needs no target of its own.
+-->
+<role xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+      oid="c5eeeeee-eeee-eeee-eeee-eeeeeeeeeeee">
+    <name>Catalog Reports Access</name>
+    <description>Requestable from the role catalog (member of Platform Team); a plain access for the per-role validity demo.</description>
+    <assignment>
+        <!-- Membership of the leaf org → shows under "Web Apps" in the catalog. -->
+        <targetRef oid="c5e10000-0000-0000-0000-000000000003" type="OrgType"/>
+    </assignment>
+    <requestable>true</requestable>
+</role>

@@ -1,0 +1,18 @@
+[
+  {
+    "dn": "uid=alpha,ou=people,dc=example,dc=org",
+    "uid": "alpha",
+    "cn": "Alpha One",
+    "sn": "One",
+    "givenName": "Alpha",
+    "mail": "alpha@example.com"
+  },
+  {
+    "dn": "uid=bravo,ou=people,dc=example,dc=org",
+    "uid": "bravo",
+    "cn": "Bravo Two",
+    "sn": "Two",
+    "givenName": "Bravo",
+    "mail": "bravo@example.com"
+  }
+]

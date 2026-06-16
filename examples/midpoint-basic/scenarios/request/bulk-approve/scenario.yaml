@@ -1,0 +1,63 @@
+# Bulk APPROVAL — alice requests TWO approval-gated roles in one request, so two
+# work items route to approver bob; bob selects BOTH and approves them in ONE bulk
+# action from his inbox (the table-header Approve over the selection, not the per-row
+# buttons or the detail page). Both grants take effect: alice ends with both role
+# assignments and — via Self-Service App Access, which induces App Target Access —
+# the App target account. The bulk decision is GUI-only (an End-user approver can't
+# complete work items over REST); the end-state is asserted over REST.
+id: request-bulk-approve
+requirement: REQ-WF-BULK-APPROVE-001
+description: >
+  alice requests "Self-Service App Access" and "Self-Service Reports Access"
+  together; approver bob selects both work items and approves them in one bulk
+  action; alice is granted both roles and provisioned the App target account.
+setup:
+  # start from an empty target (it accumulates across scenarios; absent-asserts need it clean)
+  - clear-system: app-target
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: alice, deprovision: false }
+  - clear-focus: { name: bob, deprovision: false }
+steps:
+  # given: a requester (alice) and an approver (bob, holding the Approver role).
+  - set:
+      - login: alice
+        firstname: Alice
+        lastname: Req
+        email: alice@example.com
+        disabled: ""
+        org: ""
+        roles: ""
+        password: Test1234!
+      - login: bob
+        firstname: Bob
+        lastname: Apv
+        email: bob@example.com
+        disabled: ""
+        org: ""
+        roles: Approver
+        password: Test1234!
+  - trigger: import
+  # when: alice requests BOTH gated roles at once → two work items in bob's inbox
+  - request-ui:
+      as: alice
+      items:
+        - access: Self-Service App Access
+          view: all-roles
+        - access: Self-Service Reports Access
+          view: all-roles
+  # and: bob approves both work items together (bulk select → one Approve)
+  - approve-ui:
+      as: bob
+      requests:
+        - Self-Service App Access
+        - Self-Service Reports Access
+  # then: both roles are granted; the App target account is provisioned.
+  - expect:
+      objects:
+        - type: user
+          name: alice
+          expected: expected/user.alice.json
+      accounts:
+        - system: app-target
+          identifier: alice
+          expected: expected/target.alice.json

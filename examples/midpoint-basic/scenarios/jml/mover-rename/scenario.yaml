@@ -1,0 +1,49 @@
+# Mover — rename, with assertions at two points in the flow.
+# Asserts the joined state (lastname Doe) BEFORE the rename, then the renamed
+# state (lastname Smith) propagating to focus + outbound target AFTER.
+id: mover-rename
+requirement: REQ-JML-MOVER-001
+description: >
+  jdoe is joined; we assert the joined state (Doe). Access is granted, then the HR
+  record is updated (replace) Doe -> Smith and re-imported; we assert the renamed
+  state has propagated to the focus and the outbound account.
+
+setup:
+  # start from an empty target (it accumulates across scenarios; absent-asserts need it clean)
+  - clear-system: app-target
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: jdoe, deprovision: false }
+steps:
+  - set:
+      - login: jdoe
+        firstname: John
+        lastname: Doe
+        email: jdoe@example.com
+        disabled: ""
+  - trigger: import
+  # assert the joined state before changing anything
+  - expect:
+      objects:
+        - type: user
+          name: jdoe
+          expected: expected/joined.json
+  - assign:
+      user: jdoe
+      role: App Target Access
+  - replace:
+      - login: jdoe
+        firstname: John
+        lastname: Smith
+        email: jdoe@example.com
+        disabled: ""
+  - trigger: import
+  # assert the renamed state propagated to focus + target
+  - expect:
+      objects:
+        - type: user
+          name: jdoe
+          expected: expected/renamed.json
+      accounts:
+        - system: app-target
+          identifier: jdoe
+          expected: expected/target.jdoe.json

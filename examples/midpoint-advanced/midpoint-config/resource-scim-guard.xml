@@ -1,0 +1,113 @@
+<!--
+  SCIM 2.0 target resource (OUTBOUND) — provisioned via the openstandia
+  connector-atlassian-guard (a SCIM client connector for Atlassian Guard). The
+  scim-server container stands in as the Atlassian Guard SCIM endpoint.
+
+  The connector exposes custom object classes User/Group (midPoint: ri:User /
+  ri:Group), with dotted attribute names (ri:name.givenName, ri:primaryEmail, ...).
+  Accounts are SCIM Users; the Employee archetype induces this account, so every
+  imported HR user is provisioned here at join. The access role layers the
+  app-users group membership on top.
+
+  baseURL targets the docker-network service; the connector appends
+  /ServiceProviderConfig, /Users, /Groups. The bearer token matches the
+  scim-server tenant (SCIM_TOKEN). Connector bundle:
+  jp.openstandia.connector.connector-atlassian-guard 1.0.0 (Maven Central),
+  bootstrapped into icf-connectors by infra connector_init.
+-->
+<resource xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+          xmlns:q="http://prism.evolveum.com/xml/ns/public/query-3"
+          xmlns:ri="http://midpoint.evolveum.com/xml/ns/public/resource/instance-3"
+          oid="f1000000-0000-0000-0000-000000000003">
+    <name>SCIM Atlassian Guard Target</name>
+    <description>SCIM target resource for the advanced example (outbound provisioning via connector-atlassian-guard).</description>
+    <connectorRef>
+        <filter>
+            <q:text>connectorType = "jp.openstandia.connector.atlassian.AtlassianGuardConnector"</q:text>
+        </filter>
+    </connectorRef>
+    <connectorConfiguration xmlns:icfc="http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/connector-schema-3">
+        <icfc:configurationProperties
+                xmlns:cfg="http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/bundle/jp.openstandia.connector.connector-atlassian-guard/jp.openstandia.connector.atlassian.AtlassianGuardConnector">
+            <cfg:baseURL>http://scim_server:3000/scim/v2</cfg:baseURL>
+            <cfg:token><clearValue>advanced-scim-token</clearValue></cfg:token>
+        </icfc:configurationProperties>
+    </connectorConfiguration>
+
+    <schemaHandling>
+        <objectType>
+            <displayName>SCIM Account</displayName>
+            <default>true</default>
+            <kind>account</kind>
+            <intent>default</intent>
+            <objectClass>ri:User</objectClass>
+
+            <attribute>
+                <ref>ri:userName</ref>
+                <outbound>
+                    <name>name to userName</name>
+                    <source><path>$focus/name</path></source>
+                </outbound>
+            </attribute>
+            <attribute>
+                <ref>ri:name.givenName</ref>
+                <outbound>
+                    <name>givenName to name.givenName</name>
+                    <source><path>$focus/givenName</path></source>
+                </outbound>
+            </attribute>
+            <attribute>
+                <ref>ri:name.familyName</ref>
+                <outbound>
+                    <name>familyName to name.familyName</name>
+                    <source><path>$focus/familyName</path></source>
+                </outbound>
+            </attribute>
+            <attribute>
+                <ref>ri:displayName</ref>
+                <outbound>
+                    <name>fullName to displayName</name>
+                    <source><path>$focus/fullName</path></source>
+                </outbound>
+            </attribute>
+            <attribute>
+                <ref>ri:primaryEmail</ref>
+                <outbound>
+                    <name>emailAddress to primaryEmail</name>
+                    <source><path>$focus/emailAddress</path></source>
+                </outbound>
+            </attribute>
+
+            <!-- The connector supports activation; an enabled focus -> active SCIM user. -->
+            <activation>
+                <administrativeStatus>
+                    <outbound>
+                        <name>effective status to active</name>
+                        <expression><asIs/></expression>
+                    </outbound>
+                </administrativeStatus>
+            </activation>
+
+            <!-- Group membership: the access role associates the account into the
+                 app-users SCIM Group. The connector manages membership on the Group
+                 (members.User.value holds member user ids); the account is referenced
+                 by its connector UID (userId). -->
+            <association>
+                <ref>ri:group</ref>
+                <displayName>SCIM group membership</displayName>
+                <kind>entitlement</kind>
+                <intent>group</intent>
+                <direction>objectToSubject</direction>
+                <associationAttribute>ri:members.User.value</associationAttribute>
+                <valueAttribute>ri:userId</valueAttribute>
+            </association>
+        </objectType>
+
+        <objectType>
+            <displayName>SCIM Group</displayName>
+            <kind>entitlement</kind>
+            <intent>group</intent>
+            <objectClass>ri:Group</objectClass>
+        </objectType>
+    </schemaHandling>
+</resource>

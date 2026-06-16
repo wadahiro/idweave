@@ -1,0 +1,75 @@
+<!--
+  Group-provisioning metarole — gives an access role a CORRESPONDING group in each
+  downstream system.
+
+  A RoleType is a FocusType, so it can carry projections (shadows) of its own. This
+  metarole's inducements apply (order 1) to the ROLE that holds it: they construct a
+  groupOfNames in LDAP and a Group in SCIM, named after the role ($focus/name). So
+  importing/recomputing the App Access role provisions its group in BOTH systems —
+  eagerly, before any user is assigned (no createOnDemand needed). The access role's
+  own account association then simply FINDS that group and adds members to it.
+
+  Assign this metarole to any access role that should own a group.
+-->
+<role xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+      xmlns:ri="http://midpoint.evolveum.com/xml/ns/public/resource/instance-3"
+      oid="f1000000-0000-0000-0000-000000000006">
+    <name>App Group (metarole)</name>
+    <description>Provisions a corresponding group (LDAP + SCIM) for the access role that holds it.</description>
+
+    <!-- LDAP group for the role: cn=<role name>,ou=groups. groupOfNames forbids an
+         empty member set, so it is created with the cn=nobody placeholder; the
+         access role's association adds real account DNs alongside it. -->
+    <inducement>
+        <construction>
+            <resourceRef oid="f1000000-0000-0000-0000-000000000002"/>
+            <kind>entitlement</kind>
+            <intent>group</intent>
+            <attribute>
+                <ref>ri:dn</ref>
+                <outbound>
+                    <name>role name to group dn</name>
+                    <source><path>$focus/name</path></source>
+                    <expression>
+                        <script>
+                            <code>'cn=' + name + ',ou=groups,dc=example,dc=org'</code>
+                        </script>
+                    </expression>
+                </outbound>
+            </attribute>
+            <attribute>
+                <ref>ri:cn</ref>
+                <outbound>
+                    <name>role name to cn</name>
+                    <source><path>$focus/name</path></source>
+                </outbound>
+            </attribute>
+            <attribute>
+                <ref>ri:member</ref>
+                <outbound>
+                    <name>placeholder member</name>
+                    <expression>
+                        <value>cn=nobody,dc=example,dc=org</value>
+                    </expression>
+                </outbound>
+            </attribute>
+        </construction>
+    </inducement>
+
+    <!-- SCIM group for the role: displayName = role name. SCIM Groups may be created
+         empty, so no placeholder member is needed. -->
+    <inducement>
+        <construction>
+            <resourceRef oid="f1000000-0000-0000-0000-000000000003"/>
+            <kind>entitlement</kind>
+            <intent>group</intent>
+            <attribute>
+                <ref>ri:displayName</ref>
+                <outbound>
+                    <name>role name to displayName</name>
+                    <source><path>$focus/name</path></source>
+                </outbound>
+            </attribute>
+        </construction>
+    </inducement>
+</role>

@@ -1,0 +1,29 @@
+# Automated dependency updates. Two ecosystems: the npm packages and the GitHub
+# Actions we pin by commit SHA (so the SHA pins stay current as actions release).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for routine non-breaking bumps; majors still open individually.
+      minor-and-patch:
+        update-types: [minor, patch]
+    labels: [dependencies]
+    # semantic-release-compatible: production deps -> `fix(deps): …` (patch release so
+    # the fix reaches consumers); devDeps -> `chore(deps-dev): …` (no release).
+    commit-message:
+      prefix: fix
+      prefix-development: chore
+      include: scope
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    labels: [dependencies, github-actions]
+    commit-message:
+      prefix: chore
+      include: scope

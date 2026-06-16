@@ -1,0 +1,42 @@
+# Org — import the organization tree from a source feed.
+# Each row is an org unit; the `parent` column names its parent. Unmatched rows
+# create OrgType objects, and the parent name drives an assignment to the parent
+# org (resolved by name) — midPoint then derives parentOrgRef. We assert the tree
+# by parent NAME (the oracle resolves parentOrgRef -> name, since normalize strips
+# raw refs). Rows are ordered parent-first so each parent exists when its child
+# is processed in the same import.
+id: org-import-hierarchy
+requirement: REQ-ORG-IMPORT-001
+description: >
+  A three-level org feed (Company > Engineering > Platform) is imported. Each
+  unmatched row creates an OrgType; the parent column assigns the parent org, so
+  midPoint builds the hierarchy (parentOrgRef). We assert each org exists and its
+  parent resolves to the expected name (the root has no parent).
+
+setup:
+  # leaf-first so a parentOrgRef never dangles mid-delete
+  - clear-focus: { type: org, name: Platform, deprovision: false }
+  - clear-focus: { type: org, name: Engineering, deprovision: false }
+  - clear-focus: { type: org, name: Company, deprovision: false }
+steps:
+  - system: org
+    set:
+      - orgname: Company
+        parent: ""
+      - orgname: Engineering
+        parent: Company
+      - orgname: Platform
+        parent: Engineering
+  - trigger: import
+    system: org
+  - expect:
+      objects:
+        - type: org
+          name: Company
+          expected: expected/org.company.json
+        - type: org
+          name: Engineering
+          expected: expected/org.engineering.json
+        - type: org
+          name: Platform
+          expected: expected/org.platform.json

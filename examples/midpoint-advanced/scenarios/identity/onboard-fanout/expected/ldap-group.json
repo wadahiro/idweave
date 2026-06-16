@@ -1,0 +1,8 @@
+{
+  "dn": "cn=App Access,ou=groups,dc=example,dc=org",
+  "cn": "App Access",
+  "member": [
+    "cn=nobody,dc=example,dc=org",
+    "uid=jdoe,ou=people,dc=example,dc=org"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "alice",
+  "lifecycleState": "active",
+  "assignment": [
+    {
+      "target": "Catalog App Access",
+      "type": "RoleType"
+    },
+    {
+      "target": "Employee",
+      "type": "ArchetypeType"
+    }
+  ],
+  "activation": {
+    "lockoutStatus": "normal"
+  },
+  "emailAddress": "alice@example.com",
+  "givenName": "Alice",
+  "familyName": "Req"
+}

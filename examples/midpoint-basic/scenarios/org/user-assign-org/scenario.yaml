@@ -1,0 +1,46 @@
+# Org — user assigned to an org from the HR feed (org membership).
+# A user whose HR record names a department lands UNDER that org: the `org`
+# column drives an assignment to the named OrgType, so midPoint sets the user's
+# parentOrgRef. We assert membership by parent NAME (the oracle resolves
+# parentOrgRef -> name). Self-contained: this scenario imports the small org tree
+# it needs as its own precondition (style "②"); when several org scenarios share
+# this setup, the org tree can be promoted to a prebuilt `baseline` layer.
+id: user-assign-org
+requirement: REQ-ORG-ASSIGN-001
+description: >
+  The org tree is imported (Company > Engineering). jdoe's HR record names
+  Engineering as the department; importing it assigns jdoe to the Engineering
+  org, so jdoe's membership resolves to Engineering.
+
+setup:
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: jdoe, deprovision: false }
+  - clear-focus: { type: org, name: Engineering, deprovision: false }
+  - clear-focus: { type: org, name: Company, deprovision: false }
+steps:
+  # given: the org tree (this scenario's own precondition)
+  - system: org
+    set:
+      - orgname: Company
+        parent: ""
+      - orgname: Engineering
+        parent: Company
+  - trigger: import
+    system: org
+  # when: import a user whose department is Engineering
+  - system: hr
+    set:
+      - login: jdoe
+        firstname: John
+        lastname: Doe
+        email: jdoe@example.com
+        disabled: ""
+        org: Engineering
+  - trigger: import
+    system: hr
+  # then: jdoe is a member of the Engineering org
+  - expect:
+      objects:
+        - type: user
+          name: jdoe
+          expected: expected/user.jdoe.json

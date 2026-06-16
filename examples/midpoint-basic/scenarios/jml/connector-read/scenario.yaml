@@ -1,0 +1,45 @@
+# Connector-mediated target read.
+# A joiner provisions an outbound account, which is then asserted BOTH ways: directly
+# off the CSV file (expect.accounts on the csv `app-target`) AND through midPoint's
+# connector (expect-resource-object on the `app-cx` resource). The connector read runs an
+# executeScript that calls the provisioning ResourceObjectConverter — it uses the
+# resource's connector config but persists NO shadow, so it is a side-effect-free oracle.
+# This is the generic way to assert a target idweave has no native client for. All-CSV
+# here, so the suite stays self-contained (the `resource` is not washed; surgical reset
+# deprovisions the account by deleting the focus).
+id: connector-read
+requirement: REQ-CX-READ-001
+description: >
+  A new HR row (cxjoe) is imported and granted "App Target Access", provisioning the
+  outbound App account. The account is asserted directly off the CSV target and again
+  through the connector (expect-resource-object) — the same end-state, two oracles.
+
+setup:
+  # start from an empty target (it accumulates across scenarios; absent-asserts need it clean)
+  - clear-system: app-target
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: cxjoe, deprovision: false }
+steps:
+  - set:
+      - login: cxjoe
+        firstname: Cx
+        lastname: Joe
+        email: cxjoe@example.com
+        disabled: ""
+  - trigger: import
+  - assign:
+      user: cxjoe
+      role: App Target Access
+  - expect:
+      objects:
+        - type: user
+          name: cxjoe
+          expected: expected/user.cxjoe.json
+      accounts:
+        - system: app-target
+          identifier: cxjoe
+          expected: expected/target.cxjoe.json
+  - expect-resource-object:
+      system: app-cx
+      identifier: cxjoe
+      expected: expected/connector.cxjoe.json

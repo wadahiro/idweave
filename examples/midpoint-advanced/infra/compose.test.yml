@@ -1,0 +1,11 @@
+# Test-profile overlay (same shape as the per-version examples): two binds nested
+# under midpoint_home so the harness can drive midPoint without a docker socket.
+#
+#  1. data/csv         — where the CSV connector reads the HR source the harness writes.
+#  2. ../midpoint-config — our config XML; midPoint imports it at startup, so `up`
+#     alone yields a configured stack (also re-appliable via `idw import-config`).
+services:
+  midpoint_server:
+    volumes:
+      - ./data/csv:/opt/midpoint/var/resource_files
+      - ../midpoint-config:/opt/midpoint/var/post-initial-objects:ro

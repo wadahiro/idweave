@@ -1,0 +1,29 @@
+version: "3.3"
+
+# midPoint 4.0 predates the native PostgreSQL repository (introduced experimental
+# in 4.4): there is no `init-native` / `ninja run-sql` path that works here, and
+# 4.0 only ships the generic (Hibernate) repository. So this stack is just the
+# midPoint container on its DEFAULT embedded H2 database — no postgres, no
+# data_init, no repository config at all. Reset = `down -v` (H2 lives in the
+# midpoint_home volume).
+#
+# Image: 4.0-support-alpine = the rolling 4.0 LTS build. It is amd64-only, so it
+# runs under emulation on arm64 hosts (slower boot — be patient).
+services:
+  midpoint_server:
+    image: evolveum/midpoint:${MP_VER:-4.0-support}-alpine
+    platform: linux/amd64
+    command: [ "/opt/midpoint/bin/midpoint.sh", "container" ]
+    ports:
+      - 8100:8080
+    # No repository env: midPoint 4.0 with no config defaults to the generic repo
+    # on embedded H2. 4.0 ignores midpoint.administrator.initialPassword, so the
+    # admin keeps the initial-object default 5ecr3t (Makefile sets
+    # MIDPOINT_PASSWORD=5ecr3t for VER=4.0).
+    environment:
+     - MP_NO_ENV_COMPAT=1
+    volumes:
+     - midpoint_home:/opt/midpoint/var
+
+volumes:
+  midpoint_home:

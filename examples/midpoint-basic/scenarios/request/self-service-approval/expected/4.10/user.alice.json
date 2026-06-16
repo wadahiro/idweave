@@ -1,0 +1,22 @@
+{
+  "name": "alice",
+  "lifecycleState": "active",
+  "assignment": [
+    {
+      "target": "Employee",
+      "type": "ArchetypeType"
+    },
+    {
+      "target": "Self-Service App Access",
+      "type": "RoleType"
+    }
+  ],
+  "activation": {
+    "lockoutStatus": "normal"
+  },
+  "emailAddress": "alice@example.com",
+  "fullName": "Alice Req",
+  "givenName": "Alice",
+  "familyName": "Req",
+  "personalNumber": "alice"
+}

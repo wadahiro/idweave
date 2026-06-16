@@ -1,0 +1,24 @@
+{
+  "name": "carol",
+  "lifecycleState": "active",
+  "assignment": [
+    {
+      "activation": {
+        "validFrom": "2030-01-02T00:00:00.000Z",
+        "validTo": "2030-12-31T00:00:00.000Z"
+      },
+      "target": "Catalog App Access",
+      "type": "RoleType"
+    },
+    {
+      "target": "Employee",
+      "type": "ArchetypeType"
+    }
+  ],
+  "activation": {
+    "lockoutStatus": "normal"
+  },
+  "emailAddress": "carol@example.com",
+  "givenName": "Carol",
+  "familyName": "Req"
+}

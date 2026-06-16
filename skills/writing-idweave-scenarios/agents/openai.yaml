@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Write idweave scenarios'
+  short_description: 'Author or edit an idweave scenario.yaml — the declarative midPoint e2e test.'
+  default_prompt: 'Use the writing-idweave-scenarios skill to author or edit an idweave scenario.yaml (the model, step vocabulary, expect/assert, re-runnable discipline, GUI-vs-REST).'

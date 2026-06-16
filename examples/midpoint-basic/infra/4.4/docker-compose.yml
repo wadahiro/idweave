@@ -1,0 +1,93 @@
+version: "3.3"
+
+# Image: 4.4-support-alpine = the rolling 4.4 LTS support build (currently
+# v4.4.12devel / 4.4.12-SNAPSHOT), NOT the last numbered release 4.4.11. The
+# self-service "Request a role" shopping cart in 4.4.11 hits an internal
+# SearchPanel NPE (PropertySearchItem null def → 500) on the add-to-cart
+# re-render, which breaks the GUI request scenario on repeat runs; the support
+# build fixes it. Override with MP_VER=4.4.11 to reproduce the older behaviour.
+services:
+  midpoint_data:
+    # midPoint 4.4's native (Sqale) schema (doc/config/sql/native-new) predates
+    # PostgreSQL 16's stricter inherited generated-column rule and fails to create
+    # on pg16 ("child column ... specifies generation expression"). Pin the
+    # era-appropriate PostgreSQL 13 (4.8 uses pg16 with its updated schema).
+    image: postgres:13-alpine
+    environment:
+     - POSTGRES_PASSWORD=db.secret.pw.007
+     - POSTGRES_USER=midpoint
+     - POSTGRES_INITDB_ARGS=--lc-collate=en_US.utf8 --lc-ctype=en_US.utf8
+    networks:
+     - net
+    volumes:
+     - midpoint_data:/var/lib/postgresql/data
+    # data_init runs `ninja run-sql` immediately; gate it on real DB readiness
+    # (depends_on only waits for container start, not for postgres to accept
+    # connections — otherwise the schema create races and is silently skipped).
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U midpoint"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  data_init:
+    image: evolveum/midpoint:${MP_VER:-4.4-support}-alpine
+    # Unlike 4.8, 4.4's `ninja run-sql` does NOT pick up the repository JDBC URL
+    # from MP_SET_*/config — it defaults to localhost and the schema is never
+    # created (server then dies on `relation "m_global_metadata" does not exist`).
+    # Pass the connection explicitly via --jdbc-url/--jdbc-username/--jdbc-password.
+    # The `|| echo` makes re-`up` (existing schema) idempotent: --create errors on
+    # the already-present schema, we ignore it, the server boots on the live one.
+    command: >
+      bash -c "
+      cd /opt/midpoint ;
+      bin/midpoint.sh init-native ;
+      echo ' - - - init native schema - - - ' ;
+      ( bin/ninja.sh run-sql --create --mode REPOSITORY --jdbc-url jdbc:postgresql://midpoint_data:5432/midpoint --jdbc-username midpoint --jdbc-password db.secret.pw.007 &&
+        bin/ninja.sh run-sql --create --mode AUDIT --jdbc-url jdbc:postgresql://midpoint_data:5432/midpoint --jdbc-username midpoint --jdbc-password db.secret.pw.007
+      ) || echo ' schema already present, skipping...' ;
+      "
+    depends_on:
+      midpoint_data:
+        condition: service_healthy
+    environment:
+     - MP_SET_midpoint_repository_jdbcUsername=midpoint
+     - MP_SET_midpoint_repository_jdbcPassword=db.secret.pw.007
+     - MP_SET_midpoint_repository_jdbcUrl=jdbc:postgresql://midpoint_data:5432/midpoint
+     - MP_SET_midpoint_repository_database=postgresql
+     - MP_INIT_CFG=/opt/midpoint/var
+    networks:
+     - net
+    volumes:
+     - midpoint_home:/opt/midpoint/var
+
+  midpoint_server:
+    image: evolveum/midpoint:${MP_VER:-4.4-support}-alpine
+    depends_on:
+      data_init:
+        condition: service_completed_successfully
+      midpoint_data:
+        condition: service_started
+    command: [ "/opt/midpoint/bin/midpoint.sh", "container" ]
+    ports:
+      - 8104:8080
+    environment:
+     - MP_SET_midpoint_repository_jdbcUsername=midpoint
+     - MP_SET_midpoint_repository_jdbcPassword=db.secret.pw.007
+     - MP_SET_midpoint_repository_jdbcUrl=jdbc:postgresql://midpoint_data:5432/midpoint
+     - MP_SET_midpoint_repository_database=postgresql
+     - MP_SET_midpoint_administrator_initialPassword=Test5ecr3t
+     - MP_UNSET_midpoint_repository_hibernateHbm2ddl=1
+     - MP_NO_ENV_COMPAT=1
+    networks:
+     - net
+    volumes:
+     - midpoint_home:/opt/midpoint/var
+
+networks:
+  net:
+    driver: bridge
+
+volumes:
+  midpoint_data:
+  midpoint_home:

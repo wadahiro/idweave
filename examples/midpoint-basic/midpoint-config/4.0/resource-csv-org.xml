@@ -1,0 +1,140 @@
+<!--
+  Our deployment config under test: a CSV "Org" source resource (org structure).
+
+  An authoritative feed of the ORGANIZATION TREE: each row is an org unit, with a
+  `parent` column naming its parent unit. Unmatched rows create OrgType objects
+  (focus type below is OrgType, not UserType). The hierarchy is built the midPoint
+  way: the `parent` column drives an ASSIGNMENT to the parent org (resolved by
+  name via assignmentTargetSearch) — midPoint then derives `parentOrgRef`
+  automatically. We never set parentOrgRef directly.
+
+  Stable oid + container filePath, like the other CSV resources.
+-->
+<resource xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+          xmlns:q="http://prism.evolveum.com/xml/ns/public/query-3"
+          xmlns:ri="http://midpoint.evolveum.com/xml/ns/public/resource/instance-3"
+          oid="c5666666-6666-6666-6666-666666666666">
+    <name>Org CSV Source</name>
+    <description>CSV source resource for the organization tree (focus = OrgType).</description>
+    <connectorRef type="ConnectorType">
+        <!-- 4.0 NOTE: the axiom <q:text> query form is post-4.0; resolve the CSV
+             connector by type with the classic <q:equal> filter. -->
+        <filter>
+            <q:equal>
+                <q:path>connectorType</q:path>
+                <q:value>com.evolveum.polygon.connector.csv.CsvConnector</q:value>
+            </q:equal>
+        </filter>
+    </connectorRef>
+    <connectorConfiguration xmlns:icfc="http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/connector-schema-3">
+        <icfc:configurationProperties
+                xmlns:cfg="http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/bundle/com.evolveum.polygon.connector-csv/com.evolveum.polygon.connector.csv.CsvConnector">
+            <cfg:multivalueDelimiter>;</cfg:multivalueDelimiter>
+            <cfg:fieldDelimiter>,</cfg:fieldDelimiter>
+            <cfg:quote>"</cfg:quote>
+            <cfg:filePath>/opt/midpoint/var/resource_files/org-source.csv</cfg:filePath>
+            <cfg:quoteMode>ALL</cfg:quoteMode>
+            <cfg:encoding>utf-8</cfg:encoding>
+            <cfg:uniqueAttribute>orgname</cfg:uniqueAttribute>
+        </icfc:configurationProperties>
+    </connectorConfiguration>
+
+    <schemaHandling>
+        <objectType>
+            <displayName>Org Unit</displayName>
+            <default>true</default>
+            <objectClass>ri:AccountObjectClass</objectClass>
+            <kind>account</kind>
+
+            <!-- This resource feeds OrgType focus objects, not users. In 4.4 the
+                 focus type is declared in <objectSynchronization> below, not on
+                 the objectType (the modern <focus><type> is 4.6+). -->
+
+            <attribute>
+                <ref>ri:orgname</ref>
+                <inbound>
+                    <name>Org name to focus name</name>
+                    <target>
+                        <path>$focus/name</path>
+                    </target>
+                </inbound>
+            </attribute>
+            <attribute>
+                <ref>ri:parent</ref>
+                <inbound>
+                    <!--
+                      Parent name -> an assignment to the parent OrgType (found by
+                      name). midPoint derives parentOrgRef from this org-type
+                      assignment. Skipped for a root row whose parent is blank.
+                    -->
+                    <name>Parent name to org assignment</name>
+                    <strength>strong</strength>
+                    <expression>
+                        <assignmentTargetSearch>
+                            <targetType>OrgType</targetType>
+                            <filter>
+                                <q:equal>
+                                    <q:path>name</q:path>
+                                    <expression>
+                                        <script>
+                                            <code>input</code>
+                                        </script>
+                                    </expression>
+                                </q:equal>
+                            </filter>
+                        </assignmentTargetSearch>
+                    </expression>
+                    <target>
+                        <path>assignment</path>
+                    </target>
+                    <condition>
+                        <script>
+                            <code>input != null &amp;&amp; !input.trim().isEmpty()</code>
+                        </script>
+                    </condition>
+                </inbound>
+            </attribute>
+
+            <!-- 4.4: correlation + synchronization moved to resource-level
+                 <objectSynchronization> below (4.5+/4.6+ put them here). -->
+        </objectType>
+    </schemaHandling>
+
+    <!--
+      4.4 synchronization (old schema). This resource feeds OrgType focus
+      objects, so the objectSynchronization sets focusType=OrgType and correlates
+      the org by name against the orgname attribute.
+    -->
+    <synchronization>
+        <objectSynchronization>
+            <focusType>OrgType</focusType>
+            <enabled>true</enabled>
+            <correlation>
+                <q:equal>
+                    <q:path>name</q:path>
+                    <expression>
+                        <path>$account/attributes/ri:orgname</path>
+                    </expression>
+                </q:equal>
+            </correlation>
+            <reaction>
+                <situation>linked</situation>
+                <synchronize>true</synchronize>
+            </reaction>
+            <reaction>
+                <situation>unlinked</situation>
+                <synchronize>true</synchronize>
+                <action>
+                    <handlerUri>http://midpoint.evolveum.com/xml/ns/public/model/action-3#link</handlerUri>
+                </action>
+            </reaction>
+            <reaction>
+                <situation>unmatched</situation>
+                <synchronize>true</synchronize>
+                <action>
+                    <handlerUri>http://midpoint.evolveum.com/xml/ns/public/model/action-3#addFocus</handlerUri>
+                </action>
+            </reaction>
+        </objectSynchronization>
+    </synchronization>
+</resource>

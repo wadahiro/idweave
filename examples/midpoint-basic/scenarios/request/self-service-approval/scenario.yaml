@@ -1,0 +1,68 @@
+# Self-service request with approval — driven through the GUI.
+# alice (an Employee, so an End user with self-service GUI access) requests the
+# requestable "Self-Service App Access" role FROM THE SCREEN. That role requires
+# approval, so a work item is routed to the members of the Approver role; bob
+# (an Employee holding the Approver role) APPROVES it FROM THE SCREEN. Only then
+# is App Target Access granted (induced) and the target account provisioned.
+#
+# Both the request and the approval must be GUI journeys: the actors are End
+# users without REST authorization, so REST can't perform them faithfully. The
+# end-state is still asserted over REST (expect / L3). GUI logins use the env
+# GUI password (GUI_PASSWORD, default Test1234!), which matches the password the
+# rows below seed.
+id: request-self-service-approval
+requirement: REQ-WF-REQUEST-001
+description: >
+  alice requests "Self-Service App Access" from the self-service screen; the
+  request is routed to approver bob, who approves it from his work-item inbox;
+  alice is then provisioned the App target account.
+
+setup:
+  # start from an empty target (it accumulates across scenarios; absent-asserts need it clean)
+  - clear-system: app-target
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: alice, deprovision: false }
+  - clear-focus: { name: bob, deprovision: false }
+steps:
+  # given: a requester (alice) and an approver (bob, holding the Approver role),
+  # both imported from HR with a GUI password.
+  - set:
+      - login: alice
+        firstname: Alice
+        lastname: Req
+        email: alice@example.com
+        disabled: ""
+        org: ""
+        roles: ""
+        password: Test1234!
+      - login: bob
+        firstname: Bob
+        lastname: Apv
+        email: bob@example.com
+        disabled: ""
+        org: ""
+        roles: Approver
+        password: Test1234!
+  - trigger: import
+  # when: alice requests the role from the screen, then bob approves from his inbox
+  - request-ui:
+      as: alice
+      items:
+          # This deployment publishes a role catalog (the default view is the
+          # catalog tree); this role isn't in it, so request from "all-roles".
+        - access: Self-Service App Access
+          view: all-roles
+  - approve-ui:
+      as: bob
+      request: Self-Service App Access
+      comment: Approved — alice is on the project team.
+  # then: alice is provisioned the App target account (only after approval)
+  - expect:
+      objects:
+        - type: user
+          name: alice
+          expected: expected/user.alice.json
+      accounts:
+        - system: app-target
+          identifier: alice
+          expected: expected/target.alice.json

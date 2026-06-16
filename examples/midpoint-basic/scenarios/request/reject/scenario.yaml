@@ -1,0 +1,56 @@
+# Self-service request that the approver REJECTS — driven through the GUI. The
+# negative counterpart to request-self-service-approval: dave requests the
+# approval-gated "Self-Service App Access" from the screen; the work item routes
+# to approver bob, who REJECTS it (with a comment) from his inbox. Because it's
+# rejected, App Target Access is never granted and no target account is
+# provisioned — asserted over REST (the account is absent).
+#
+# A distinct requester (dave) keeps this independent of the approve scenario's
+# alice. The comment is GUI-only input (lands on the case, not the focus
+# end-state), so it's driven but not asserted.
+id: request-reject
+requirement: REQ-WF-REJECT-001
+description: >
+  dave requests "Self-Service App Access"; approver bob rejects it from his
+  work-item inbox with a comment; dave is NOT provisioned the App target account.
+setup:
+  # start from an empty target (it accumulates across scenarios; absent-asserts need it clean)
+  - clear-system: app-target
+  # precondition: own only what we create — clear a leftover from a failed run
+  - clear-focus: { name: dave, deprovision: false }
+  - clear-focus: { name: bob, deprovision: false }
+steps:
+  - set:
+      - login: dave
+        firstname: Dave
+        lastname: Req
+        email: dave@example.com
+        disabled: ""
+        org: ""
+        roles: ""
+        password: Test1234!
+      - login: bob
+        firstname: Bob
+        lastname: Apv
+        email: bob@example.com
+        disabled: ""
+        org: ""
+        roles: Approver
+        password: Test1234!
+  - trigger: import
+  - request-ui:
+      as: dave
+      comment: Requesting app access for the new project.
+      items:
+        - access: Self-Service App Access
+          view: all-roles
+  - reject-ui:
+      as: bob
+      request: Self-Service App Access
+      comment: Denied — no current business need.
+  # then: rejected → nothing granted → no App target account for dave
+  - expect:
+      accounts:
+        - system: app-target
+          identifier: dave
+          absent: true

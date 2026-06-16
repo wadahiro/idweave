@@ -1,0 +1,9 @@
+<!-- Role-catalog org, level 2 (child of Catalog Root). -->
+<org xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+     oid="c5e10000-0000-0000-0000-000000000002">
+    <name>Cloud Services</name>
+    <displayName>Cloud Services</displayName>
+    <assignment>
+        <targetRef oid="c5e10000-0000-0000-0000-000000000001" type="OrgType"/>
+    </assignment>
+</org>

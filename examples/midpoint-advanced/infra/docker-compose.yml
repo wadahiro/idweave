@@ -1,0 +1,162 @@
+# "advanced" example — one midPoint 4.10 deployment provisioning OUTBOUND to two
+# real downstream systems at once:
+#
+#   • OpenLDAP (osixia/openldap v2)          — accounts + group membership
+#   • SCIM 2.0 server (wadahiro/scim-server)  — driven through midPoint's
+#       connector-atlassian-guard, so scim-server stands in as an Atlassian Guard
+#       SCIM endpoint (its compatibility knobs match what the connector expects).
+#
+# HR (CSV) is the inbound source; a join fans an account out to BOTH targets, and
+# an access-role grant propagates a group membership to BOTH. idweave asserts the
+# REAL end-state in each system (LDAP via its `ldap` client, SCIM via its `scim`
+# client). The midPoint half mirrors the per-version examples; the extra services
+# and the connector-jar bootstrap are what this example adds.
+
+version: "3.3"
+
+services:
+  midpoint_data:
+    image: postgres:16-alpine
+    environment:
+     - POSTGRES_PASSWORD=db.secret.pw.007
+     - POSTGRES_USER=midpoint
+     - POSTGRES_INITDB_ARGS=--lc-collate=en_US.utf8 --lc-ctype=en_US.utf8
+    networks:
+     - net
+    volumes:
+     - midpoint_data:/var/lib/postgresql/data
+
+  data_init:
+    image: evolveum/midpoint:${MP_VER:-4.10.3}-alpine
+    command: >
+      bash -c "
+      cd /opt/midpoint ;
+      bin/midpoint.sh init-native ;
+      echo ' - - - - - - ' ;
+      bin/ninja.sh -B info >/dev/null 2>/tmp/ninja.log ;
+      grep -q \"ERROR\" /tmp/ninja.log && (
+      bin/ninja.sh run-sql --create --mode REPOSITORY  ;
+      bin/ninja.sh run-sql --create --mode AUDIT
+      ) ||
+      echo -e '\\n Repository init is not needed...' ;
+      "
+    depends_on:
+     - midpoint_data
+    environment:
+     - MP_SET_midpoint_repository_jdbcUsername=midpoint
+     - MP_SET_midpoint_repository_jdbcPassword=db.secret.pw.007
+     - MP_SET_midpoint_repository_jdbcUrl=jdbc:postgresql://midpoint_data:5432/midpoint
+     - MP_SET_midpoint_repository_database=postgresql
+     - MP_INIT_CFG=/opt/midpoint/var
+    networks:
+     - net
+    volumes:
+     - midpoint_home:/opt/midpoint/var
+
+  # One-shot: fetch the connector-atlassian-guard bundle from Maven Central into
+  # the icf-connectors volume midPoint loads 3rd-party ConnId connectors from.
+  # Idempotent (skips the download if the jar is already in the volume), so a
+  # restart or snapshot-restore does not re-pull it.
+  connector_init:
+    image: curlimages/curl:8.11.0
+    # Run as root: the fresh icf-connectors volume is root-owned, and curl's
+    # default uid 100 cannot create the jar there (curl exit 23).
+    user: "0:0"
+    entrypoint: ["sh", "-c"]
+    command:
+     - >
+       set -e ;
+       JAR=/icf-connectors/connector-atlassian-guard-1.0.0.jar ;
+       if [ -f "$$JAR" ]; then echo "connector jar already present" ; else
+       echo "downloading connector-atlassian-guard-1.0.0.jar ..." ;
+       curl -fsSL -o "$$JAR" https://repo1.maven.org/maven2/jp/openstandia/connector/connector-atlassian-guard/1.0.0/connector-atlassian-guard-1.0.0.jar ;
+       fi ;
+       ls -la /icf-connectors
+    volumes:
+     - midpoint_connectors:/icf-connectors
+    networks:
+     - net
+
+  midpoint_server:
+    image: evolveum/midpoint:${MP_VER:-4.10.3}-alpine
+    depends_on:
+      data_init:
+        condition: service_completed_successfully
+      connector_init:
+        condition: service_completed_successfully
+      midpoint_data:
+        condition: service_started
+    command: [ "/opt/midpoint/bin/midpoint.sh", "container" ]
+    ports:
+      # Dedicated host port for this example (per-example port convention; keep in
+      # sync with PORT_advanced in the Makefile).
+      - 8112:8080
+    environment:
+     - MP_SET_midpoint_repository_jdbcUsername=midpoint
+     - MP_SET_midpoint_repository_jdbcPassword=db.secret.pw.007
+     - MP_SET_midpoint_repository_jdbcUrl=jdbc:postgresql://midpoint_data:5432/midpoint
+     - MP_SET_midpoint_repository_database=postgresql
+     - MP_SET_midpoint_administrator_initialPassword=Test5ecr3t
+     - MP_UNSET_midpoint_repository_hibernateHbm2ddl=1
+     - MP_NO_ENV_COMPAT=1
+    networks:
+     - net
+    volumes:
+     - midpoint_home:/opt/midpoint/var
+     # Overlay just the connector dir with the volume the init populated (a bind
+     # nested under midpoint_home; the more specific mount wins).
+     - midpoint_connectors:/opt/midpoint/var/icf-connectors
+
+  # OpenLDAP v2 (osixia develop line). v2 listens on the non-privileged ports
+  # 3890 (ldap) / 6360 (ldaps); we publish ldap on host 1389. Custom bootstrap
+  # LDIF (ou=people, ou=groups, the app-users group) is seeded on first start;
+  # the memberof overlay maintains each account's memberOf so membership can be
+  # asserted from the account entry.
+  openldap:
+    image: osixia/openldap:2.6.10-alpha
+    environment:
+      OPENLDAP_BOOTSTRAP_ORGANIZATION: "Example Org"
+      OPENLDAP_BOOTSTRAP_SUFFIX: "dc=example,dc=org"
+      # cn=admin,dc=example,dc=org / adminpassword. olcRootPW takes the value
+      # verbatim; an unprefixed value is a cleartext rootpw (fine for a dev fixture).
+      OPENLDAP_BOOTSTRAP_DATA_ROOT_PASSWORD_HASHED: "adminpassword"
+      OPENLDAP_BOOTSTRAP_MEMBEROF: "true"
+    ports:
+      - 13890:3890
+    volumes:
+      - ./openldap/bootstrap:/container/services/openldap-bootstrap/assets/ldif/data/custom:ro
+      - openldap_data:/var/lib/openldap/openldap-data
+      - openldap_conf:/etc/openldap/slapd.d
+    networks:
+     - net
+
+  # SCIM 2.0 service provider standing in as the Atlassian Guard endpoint. One
+  # bearer tenant at /scim/v2; SQLite under /tmp (writable in the distroless
+  # image, shared across requests within the container's life).
+  scim_server:
+    image: ghcr.io/wadahiro/scim-server:0.4.1
+    command: ["-c", "/etc/scim/config.yaml"]
+    # Run as root so the SQLite file can be created on the root-owned data volume
+    # (the distroless image's default nonroot uid cannot write a fresh volume).
+    user: "0:0"
+    environment:
+      - SCIM_TOKEN=advanced-scim-token
+    ports:
+      - 13000:3000
+    volumes:
+      - ./scim/config.yaml:/etc/scim/config.yaml:ro
+      - scim_data:/data
+    networks:
+     - net
+
+networks:
+  net:
+    driver: bridge
+
+volumes:
+  midpoint_data:
+  midpoint_home:
+  midpoint_connectors:
+  openldap_data:
+  openldap_conf:
+  scim_data:

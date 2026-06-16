@@ -1,0 +1,74 @@
+<!--
+  App Access role — the RBAC -> group provisioning + membership this example verifies.
+
+  It holds the App Group metarole, which provisions a CORRESPONDING group named
+  after this role ("App Access") in BOTH the LDAP and SCIM targets (see
+  metarole-app-group.xml). Assigning the role then adds the user's LDAP and SCIM
+  accounts (provisioned at join by the Employee archetype) to that group: each
+  inducement's account construction carries an association whose target is found by
+  an associationTargetSearch over the role's group (LDAP: by DN; SCIM: by
+  displayName). The group already exists (provisioned by the metarole), so no
+  createOnDemand is needed.
+-->
+<role xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+      xmlns:q="http://prism.evolveum.com/xml/ns/public/query-3"
+      xmlns:ri="http://midpoint.evolveum.com/xml/ns/public/resource/instance-3"
+      oid="f1000000-0000-0000-0000-000000000004">
+    <name>App Access</name>
+    <description>Provisions the App Access group (LDAP + SCIM) and adds holders to it.</description>
+
+    <!-- Own a corresponding group in each target, provisioned for this role. -->
+    <assignment>
+        <targetRef oid="f1000000-0000-0000-0000-000000000006" type="RoleType"/>
+    </assignment>
+
+    <inducement>
+        <construction>
+            <resourceRef oid="f1000000-0000-0000-0000-000000000002"/>
+            <kind>account</kind>
+            <intent>default</intent>
+            <association>
+                <ref>ri:group</ref>
+                <outbound>
+                    <name>App Access LDAP group</name>
+                    <expression>
+                        <associationTargetSearch>
+                            <filter>
+                                <q:equal>
+                                    <q:path>attributes/ri:dn</q:path>
+                                    <q:value>cn=App Access,ou=groups,dc=example,dc=org</q:value>
+                                </q:equal>
+                            </filter>
+                            <searchStrategy>onResourceIfNeeded</searchStrategy>
+                        </associationTargetSearch>
+                    </expression>
+                </outbound>
+            </association>
+        </construction>
+    </inducement>
+
+    <inducement>
+        <construction>
+            <resourceRef oid="f1000000-0000-0000-0000-000000000003"/>
+            <kind>account</kind>
+            <intent>default</intent>
+            <association>
+                <ref>ri:group</ref>
+                <outbound>
+                    <name>App Access SCIM group</name>
+                    <expression>
+                        <associationTargetSearch>
+                            <filter>
+                                <q:equal>
+                                    <q:path>attributes/ri:displayName</q:path>
+                                    <q:value>App Access</q:value>
+                                </q:equal>
+                            </filter>
+                            <searchStrategy>onResourceIfNeeded</searchStrategy>
+                        </associationTargetSearch>
+                    </expression>
+                </outbound>
+            </association>
+        </construction>
+    </inducement>
+</role>

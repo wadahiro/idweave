@@ -1,0 +1,14 @@
+{
+  "userName": "<consistent:emailAddress>",
+  "active": true,
+  "displayName": "John Doe",
+  "name/givenName": "John",
+  "name/familyName": "Doe",
+  "emails": [
+    {
+      "primary": true,
+      "value": "jdoe@example.com"
+    }
+  ],
+  "groups": "<dynamic>"
+}

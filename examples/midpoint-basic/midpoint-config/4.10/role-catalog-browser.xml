@@ -1,0 +1,18 @@
+<!--
+  Lets a requester READ the role-catalog org tree (and services) so they can
+  browse it in self-service. The standard End user role authorizes reading
+  requestable roles (the flat views) but not OrgType, so without this the catalog
+  tree shows only its root node for the requester (children fail to load on 403).
+  Induced by the Employee archetype, so every requester gets it.
+-->
+<role xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+      oid="c5dddddd-dddd-dddd-dddd-dddddddddddd">
+    <name>Catalog Browser</name>
+    <description>Read access to the role-catalog org tree and services (for self-service browsing).</description>
+    <authorization>
+        <name>read org tree + services for the catalog</name>
+        <action>http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#read</action>
+        <object><type>OrgType</type></object>
+        <object><type>ServiceType</type></object>
+    </authorization>
+</role>

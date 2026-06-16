@@ -1,0 +1,52 @@
+# Onboarding fan-out to two systems at once, plus role-driven group provisioning.
+# A new HR row joins as a midPoint user (Employee archetype), which auto-provisions
+# a baseline account to BOTH the LDAP directory and the SCIM (Atlassian Guard)
+# endpoint. The App Access role OWNS a corresponding group in each system (its
+# metarole projects an "App Access" group into LDAP + SCIM). Granting the role adds
+# jdoe to that group in BOTH systems from a single assignment. idweave asserts the
+# REAL end-state: the user, each account (incl. group membership), AND each
+# provisioned group object (incl. its member).
+id: onboard-fanout
+requirement: REQ-ADVANCED-FANOUT-001
+description: >
+  jdoe is imported from HR (unmatched -> addFocus) and auto-provisioned to LDAP and
+  SCIM by the Employee archetype. The App Access role provisions a corresponding
+  "App Access" group in both targets; granting it adds jdoe to that group. Assert
+  the user, both accounts (memberOf / groups), and both provisioned group objects.
+
+setup:
+  # Self-healing pre-clean: clean up jdoe AND its provisioned LDAP/SCIM accounts, so a
+  # re-run (or a prior whole-container clear by the all-set scenarios) re-provisions from
+  # scratch — a plain re-import of an unchanged focus would NOT recreate a deleted account.
+  # clear-focus force-removes the accounts WF-safely (the HR source is protected, so it's
+  # left intact). The App Access GROUP is role-owned (not jdoe's), so it survives.
+  - idm/clear-focus: { name: jdoe }
+steps:
+  - set:
+      - login: jdoe
+        firstname: John
+        lastname: Doe
+        email: jdoe@example.com
+  - trigger: import
+  - assign:
+      user: jdoe
+      role: App Access
+  - expect:
+      objects:
+        - type: user
+          name: jdoe
+          expected: expected/user.jdoe.json
+      accounts:
+        - system: dir
+          identifier: jdoe
+          expected: expected/ldap.jdoe.json
+        - system: guard
+          identifier: jdoe
+          expected: expected/scim.jdoe.json
+        # The group OBJECTS the role provisioned (named after the role).
+        - system: dir-groups
+          identifier: App Access
+          expected: expected/ldap-group.json
+        - system: guard-groups
+          identifier: App Access
+          expected: expected/scim-group.json

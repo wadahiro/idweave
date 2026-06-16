@@ -1,0 +1,16 @@
+[
+  {
+    "userName": "alpha",
+    "active": true,
+    "displayName": "Alpha One",
+    "name/givenName": "Alpha",
+    "name/familyName": "One"
+  },
+  {
+    "userName": "bravo",
+    "active": true,
+    "displayName": "Bravo Two",
+    "name/givenName": "Bravo",
+    "name/familyName": "Two"
+  }
+]
