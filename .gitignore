@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.DS_Store
 # Run output (junit/ctrf/dumps) — per-version example folder (examples/<ver>/).
 examples/*/reports/
 # Bind-mounted CSV files are produced at runtime, not committed.

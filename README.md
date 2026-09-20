@@ -346,8 +346,9 @@ is consistent across systems. Two refinements keep it fast:
 
 - **Fast restore (no full reboot)** skips midPoint's slow restart: it stops only the
   DB, pauses the rest, rolls back just the DB volume, and the app reconnects in ~1s
-  (then idweave refreshes the in-memory caches of each declared `midpoint`/`keycloak`
-  instance for you — they would otherwise serve stale data after the rolled-back DB).
+  (midPoint tasks are first stopped; afterward idweave refreshes its caches, synchronizes
+  Quartz with the restored repository, and resumes the scheduler. Keycloak's caches are
+  also refreshed.)
   Declare the topology in
   `suite.snapshot.restore: { stop: [...], rollback: [...] }`. Build the baseline right
   after a clean start and don't restart midPoint before restoring; if you do,

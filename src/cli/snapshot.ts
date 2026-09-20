@@ -34,7 +34,7 @@ import {
 } from "node:fs";
 import { resolve, join, relative, isAbsolute, dirname } from "node:path";
 import { loadSuite, type SnapshotSpec } from "../scenario/suite.ts";
-import { runAfterRestore } from "../scenario/restore.ts";
+import { runBeforeRestore, runAfterRestore } from "../scenario/restore.ts";
 import { loadConfig } from "../config.ts";
 
 const DEFAULT_SNAPSHOT = "baseline";
@@ -389,6 +389,12 @@ export async function snapshotRestore(name?: string): Promise<void> {
   // the full stop/reset path below.
   const plan = await resolveRestorePlan();
   if (plan && nearNonStopSafe(plan, dir, composeArgs)) {
+    // Quiesce midPoint's scheduler and running tasks while its repository is
+    // still live. Without this, a task created or running after the snapshot
+    // could survive in memory and write into the rolled-back repository when
+    // the paused app resumes. A quiesce failure aborts before Docker state is
+    // touched; falling through to a live rollback would be less safe.
+    await runBeforeRestoreHooks();
     const paused = Object.keys(serviceStartedAt(composeArgs)).filter((s) => !plan.stopServices.includes(s));
     console.log(
       `Near-non-stop restore "${snap}" [${backend}]: stop [${plan.stopServices.join(", ")}], pause [${paused.join(", ") || "-"}]...`,
@@ -466,6 +472,17 @@ async function runRestoreHooks(): Promise<void> {
   } catch (e) {
     console.warn(`  after-restore hooks skipped: ${(e as Error).message}`);
   }
+}
+
+/**
+ * Run the mandatory pre-rollback hooks for a near-non-stop restore. Unlike the
+ * post-restore cache repair, failure here is fatal: proceeding could resume a
+ * still-running task against a repository that has just been rolled back.
+ */
+async function runBeforeRestoreHooks(): Promise<void> {
+  const cfg = loadConfig();
+  const suite = await loadSuite(cfg.scenariosDir);
+  await runBeforeRestore(suite, cfg);
 }
 
 /**

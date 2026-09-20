@@ -50,6 +50,8 @@ describe("restoreParticipant", () => {
     process.env.MP_PW = "pw";
     const p = restoreParticipant("idm", midpointSys, cfg);
     expect(p!.label).toContain("midpoint:idm");
+    expect(typeof p!.beforeRestore).toBe("function");
+    expect(p!.requiredAfterRestore).toBe(true);
   });
 
   it("returns null for external systems (csv/ldap/db — rolled back by snapshot)", () => {

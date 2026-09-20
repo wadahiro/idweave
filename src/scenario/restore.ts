@@ -1,24 +1,28 @@
 /**
- * Restore participants — the extension point for "a system does its own post-restore
- * fix-up". A whole-env snapshot-restore rolls back volumes generically (infra: docker +
- * btrfs); afterwards, each system that needs in-memory reconciliation implements
- * `afterRestore()` and the orchestration calls it polymorphically. No per-action
- * config: the system TYPE decides its behavior.
+ * Restore participants — the extension point for system-specific rollback repair.
+ * A near-non-stop restore first calls `beforeRestore()` to quiesce volatile work,
+ * then rolls back volumes generically (infra: docker + btrfs), then calls
+ * `afterRestore()` to reconcile in-memory state. No per-action config: the system
+ * TYPE decides its behavior.
  *
  * Implementations (one place to see "which system does what" on restore):
- *   - midpoint → CLEAR CACHES (its RepositoryCache holds the rolled-back DB; see
- *     clients/cacheClear.ts). Version-correct per instance.
+ *   - midpoint → STOP TASKS + SCHEDULER, then clear caches, synchronize Quartz,
+ *     and restart the scheduler (see clients/cacheClear.ts). Version-correct per instance.
  *   - keycloak → CLEAR CACHES (its realm/user/keys Infinispan caches hold the
  *     rolled-back DB; see clients/keycloakCacheClear.ts). Version-independent.
  *   - csv / ldap / db → no hook (their data is rolled back by snapshot itself).
  */
 import type { Config } from "../config.ts";
-import { clearMidpointCache } from "../clients/cacheClear.ts";
+import { quiesceMidpointTasks, restoreMidpointTasks } from "../clients/cacheClear.ts";
 import { clearKeycloakCaches } from "../clients/keycloakCacheClear.ts";
 import { midpointConnection, keycloakAdminConnection, type Suite, type SystemSpec } from "./suite.ts";
 
 export interface RestoreParticipant {
   readonly label: string;
+  /** Quiesce state that cannot survive an out-of-band store rollback. */
+  beforeRestore?(): Promise<void>;
+  /** A failed repair leaves the system unsafe to use and must fail the restore. */
+  requiredAfterRestore?: boolean;
   /** Reconcile in-memory state with the rolled-back stores (called after snapshot-restore). */
   afterRestore(): Promise<void>;
 }
@@ -32,7 +36,11 @@ export function restoreParticipant(name: string, sys: SystemSpec, cfg: Config): 
     const conn = midpointConnection(m);
     return {
       label: `midpoint:${name} (${conn.baseUrl}, v${m.version})`,
-      afterRestore: () => clearMidpointCache(conn, m.version, cfg.poll),
+      // All supported 4.x majors expose these TaskManager methods. The Groovy
+      // scripts select the version-correct SpringApplicationContextHolder.
+      beforeRestore: () => quiesceMidpointTasks(conn, m.version, cfg.poll),
+      requiredAfterRestore: true,
+      afterRestore: () => restoreMidpointTasks(conn, m.version, cfg.poll),
     };
   }
   if (sys.keycloak) {
@@ -53,6 +61,15 @@ export function restoreParticipants(suite: Suite, cfg: Config): RestoreParticipa
     .filter((p): p is RestoreParticipant => p !== null);
 }
 
+/** Stop each participant that has volatile work before a near-non-stop rollback. */
+export async function runBeforeRestore(suite: Suite, cfg: Config): Promise<void> {
+  for (const p of restoreParticipants(suite, cfg)) {
+    if (!p.beforeRestore) continue;
+    await p.beforeRestore();
+    console.log(`before-restore: ${p.label} quiesced`);
+  }
+}
+
 /** Run every participant's `afterRestore` (a per-participant failure is a loud WARN, not fatal). */
 export async function runAfterRestore(suite: Suite, cfg: Config): Promise<void> {
   const participants = restoreParticipants(suite, cfg);
@@ -65,6 +82,7 @@ export async function runAfterRestore(suite: Suite, cfg: Config): Promise<void> 
       await p.afterRestore();
       console.log(`after-restore: ${p.label} ok`);
     } catch (e) {
+      if (p.requiredAfterRestore) throw e;
       console.warn(`WARN after-restore ${p.label}: ${(e as Error).message}`);
     }
   }

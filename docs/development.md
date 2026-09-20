@@ -129,13 +129,14 @@ multi-minute midPoint restart. Two auto-handled constraints — don't fight them
    the node self-diagnostic reads as split-brain and **permanently kills the Quartz scheduler**. The
    `nearNonStopSafe` guard records each service's `StartedAt` at `snapshot-build` and **auto-falls-back to a
    full restart** if a paused service restarted — preventing the silent scheduler death.
-2. **After the rollback, snapshot-restore runs each system's `afterRestore` hook.** For midPoint that clears
-   its now-stale `RepositoryCache` (global cache is on; an external DB change has no invalidation
-   trigger, so it can be stale for ~10–60s). The cache-clear is `CacheDispatcher.dispatchInvalidation`
-   run as a Groovy bulk action over admin REST; the `SpringApplicationContextHolder` package moved
-   between major versions (4.0/4.4 = `wf.impl.processes.common`, 4.8/4.10 = `model.impl.expr`), so the
-   clear script branches on `version`. A `keycloak` instance's hook instead clears its realm/user/keys
-   caches over admin REST (version-independent — the endpoints are stable, no branch).
+2. **Tasks are quiesced and resynchronized.** Before the DB rollback, midPoint's local scheduler and
+   running tasks are stopped (bounded wait). Afterward, idweave clears its `RepositoryCache`, synchronizes
+   the Quartz job store with the restored repository, then starts the local scheduler. This removes jobs
+   created after the snapshot and restores baseline triggers. The Groovy hook uses the public `TaskManager`
+   methods supported by 4.0/4.4/4.8/4.10; its `SpringApplicationContextHolder` lookup branches by version
+   (4.0/4.4 = `wf.impl.processes.common`, 4.8/4.10 = `model.impl.expr`). A failure is fatal: resuming an
+   unsynchronized scheduler would be unsafe. A `keycloak` instance's post-restore hook instead clears its
+   realm/user/keys caches over admin REST (version-independent — the endpoints are stable, no branch).
 
 Mechanism and the reasoning behind both: code comments in `src/scenario/restore.ts`,
 `src/clients/cacheClear.ts`, and `src/cli/snapshot.ts`. Backend choice (tar / btrfs) and the rootless-docker

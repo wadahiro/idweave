@@ -50,7 +50,8 @@ else
   # picks the infra compose, post-init config, GUI page objects (MP_VERSION), and the
   # expected/<ver>/ tree (EXPECTED_VERSION).
   EX          := examples/midpoint-basic
-  VERID       := $(subst .,,$(VER))   # compose project names can't contain dots (4.10->410)
+  # Compose project names cannot contain dots (4.10 -> 410).
+  VERID       := $(subst .,,$(VER))
   INFRA_DIR   := $(EX)/infra/$(VER)
   CONFIG      := $(EX)/midpoint-config/$(VER)
   # The CSV source/target files are external-system data, version-independent and

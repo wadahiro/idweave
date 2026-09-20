@@ -6,13 +6,14 @@
  * Why: a near-non-stop snapshot-restore rolls the repository DB back WITHOUT restarting
  * midPoint, so its in-memory RepositoryCache (global object/version/query caches,
  * ON by default) can serve STALE data for up to its version-check/TTL window
- * (~10–60s) — nothing invalidates on an out-of-band DB change (verified against the
- * 4.10 source). Clearing after the restore removes that window. A full-restart
- * restore reboots midPoint, so this is a harmless no-op there.
+ * (~10–60s) — nothing invalidates on an out-of-band DB change. A near-non-stop
+ * restore also has to quiesce running tasks, then synchronize the Quartz job store
+ * before resuming the scheduler. A full-restart restore reboots midPoint, so none
+ * of these in-memory repairs are needed there.
  *
  * The clear reaches midPoint-internal beans via Groovy (unsandboxed by default), so
- * it is midPoint- AND version-specific — `clearCacheScript(version)` is the place to
- * branch the payload per major version (the 4.x payload below is verified on 4.10).
+ * it is midPoint- AND version-specific. The shared TaskManager API is present in
+ * 4.0, 4.4, 4.8, and 4.10; the Spring context holder is selected per major below.
  */
 import { MidpointRest } from "./midpointRest.ts";
 import { pollUntil } from "../poll.ts";
@@ -32,11 +33,8 @@ function contextHolderClass(version: string): string {
     : "com.evolveum.midpoint.model.impl.expr.SpringApplicationContextHolder";
 }
 
-/** The version-correct `executeScript` payload that clears all caches. */
-function clearCacheScript(version: string): string {
-  // Get the CacheDispatcher bean by TYPE (its bean name is `cacheDispatcherImpl`, so
-  // the name-derived lookup misses) and invalidate everything cluster-wide.
-  const holder = contextHolderClass(version);
+/** Wrap a Groovy body in the version-correct executeScript payload. */
+function script(version: string, code: string): string {
   return `<s:executeScript xmlns:s="http://midpoint.evolveum.com/xml/ns/public/model/scripting-3"
                  xmlns:c="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -46,17 +44,72 @@ function clearCacheScript(version: string): string {
       <s:name>script</s:name>
       <c:value xsi:type="c:ScriptExpressionEvaluatorType">
         <c:code>
-          ${holder}
-            .getApplicationContext()
-            .getBean(com.evolveum.midpoint.repo.api.CacheDispatcher.class)
-            .dispatchInvalidation(null, null, true, null)
-          return 'caches cleared'
+          ${code}
         </c:code>
       </c:value>
     </s:parameter>
     <s:parameter><s:name>forWholeInput</s:name><c:value>true</c:value></s:parameter>
   </s:action>
 </s:executeScript>`;
+}
+
+/** The version-correct `executeScript` payload that clears all caches. */
+export function clearCacheScript(version: string): string {
+  // Get the CacheDispatcher bean by TYPE (its bean name is `cacheDispatcherImpl`, so
+  // the name-derived lookup misses) and invalidate everything cluster-wide.
+  const holder = contextHolderClass(version);
+  return script(version, `${holder}
+            .getApplicationContext()
+            .getBean(com.evolveum.midpoint.repo.api.CacheDispatcher.class)
+            .dispatchInvalidation(null, null, true, null)
+          return 'caches cleared'`);
+}
+
+/**
+ * Stop the local Quartz scheduler and its running tasks before an out-of-band
+ * repository rollback. The wait is deliberately bounded: a restore must not
+ * freeze forever behind a task that cannot stop cleanly.
+ */
+export function quiesceMidpointTasksScript(version: string, timeoutMs = 60_000): string {
+  const holder = contextHolderClass(version);
+  return script(version, `def taskManager = ${holder}
+            .getApplicationContext()
+            .getBean(com.evolveum.midpoint.task.api.TaskManager.class)
+          def result = new com.evolveum.midpoint.schema.result.OperationResult('idweave.snapshot.quiesce')
+          def stopped = taskManager.stopSchedulersAndTasks([taskManager.getNodeId()], ${timeoutMs}L, result)
+          result.computeStatusIfUnknown()
+          if (!stopped || !result.isSuccess()) {
+            throw new IllegalStateException('Could not stop all midPoint tasks before snapshot restore: ' + result)
+          }
+          return 'tasks quiesced'`);
+}
+
+/**
+ * Reconcile Quartz with the rolled-back repository, then resume the local
+ * scheduler. `synchronizeTasks` removes jobs created after the snapshot and
+ * recreates/updates triggers for tasks that exist in the restored repository.
+ */
+export function restoreMidpointTasksScript(version: string): string {
+  const holder = contextHolderClass(version);
+  return script(version, `${holder}
+            .getApplicationContext()
+            .getBean(com.evolveum.midpoint.repo.api.CacheDispatcher.class)
+            .dispatchInvalidation(null, null, true, null)
+          def taskManager = ${holder}
+            .getApplicationContext()
+            .getBean(com.evolveum.midpoint.task.api.TaskManager.class)
+          def result = new com.evolveum.midpoint.schema.result.OperationResult('idweave.snapshot.restore-tasks')
+          taskManager.synchronizeTasks(result)
+          result.computeStatusIfUnknown()
+          if (!result.isSuccess()) {
+            throw new IllegalStateException('Could not synchronize midPoint tasks after snapshot restore: ' + result)
+          }
+          taskManager.startLocalScheduler(result)
+          result.computeStatusIfUnknown()
+          if (!result.isSuccess()) {
+            throw new IllegalStateException('Could not start the midPoint scheduler after snapshot restore: ' + result)
+          }
+          return 'caches cleared; tasks synchronized; scheduler started'`);
 }
 
 /**
@@ -72,5 +125,29 @@ export async function clearMidpointCache(conn: MidpointConfig, version: string, 
     (ok) => ok,
     poll,
     `midPoint cache clear (${conn.baseUrl})`,
+  );
+}
+
+/** Quiesce the local scheduler before a near-non-stop repository rollback. */
+export async function quiesceMidpointTasks(conn: MidpointConfig, version: string, poll: PollConfig): Promise<void> {
+  const rest = new MidpointRest(conn);
+  const xml = quiesceMidpointTasksScript(version);
+  await pollUntil(
+    () => rest.executeScriptXml(xml).then(() => true).catch(() => false),
+    (ok) => ok,
+    poll,
+    `midPoint task quiesce (${conn.baseUrl})`,
+  );
+}
+
+/** Restore midPoint's cache and scheduler state after a near-non-stop rollback. */
+export async function restoreMidpointTasks(conn: MidpointConfig, version: string, poll: PollConfig): Promise<void> {
+  const rest = new MidpointRest(conn);
+  const xml = restoreMidpointTasksScript(version);
+  await pollUntil(
+    () => rest.executeScriptXml(xml).then(() => true).catch(() => false),
+    (ok) => ok,
+    poll,
+    `midPoint task synchronization (${conn.baseUrl})`,
   );
 }
